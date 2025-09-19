@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Farm Manager", "Farm Manager\Farm Manager.csproj", "{999597C5-D7D0-4AF4-A393-4B1436678595}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{999597C5-D7D0-4AF4-A393-4B1436678595}.Debug|x64.ActiveCfg = Debug|x64
+		{999597C5-D7D0-4AF4-A393-4B1436678595}.Debug|x64.Build.0 = Debug|x64
+		{999597C5-D7D0-4AF4-A393-4B1436678595}.Release|x64.ActiveCfg = Release|x64
+		{999597C5-D7D0-4AF4-A393-4B1436678595}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {637C7ECD-57EA-4350-BFDB-B39C55D8FF29}
+	EndGlobalSection
+EndGlobal

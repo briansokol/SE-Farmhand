@@ -1,0 +1,14 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio 2015/2017 cache/options directory
+.vs/
+
+# Visual Studio Code cache/options directory
+.vscode/
+
+# AI Tools
+.claude/*local*
