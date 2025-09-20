@@ -17,7 +17,7 @@ A Space Engineers programmable block script for automated farm management.
 3. Configure the block group name in the Programmable Block's custom data
 4. Add farm plots, irrigation systems, LCD panels, and air vents to the named group
 
-## Status Indicators
+## Status Indicators (Configurable)
 
 - **Purple Light**: Empty planter
 - **White Light**: Plant growing

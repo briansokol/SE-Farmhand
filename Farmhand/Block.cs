@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
 

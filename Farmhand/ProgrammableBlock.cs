@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
 
@@ -8,6 +9,7 @@ namespace IngameScript
     {
         private readonly IMyProgrammableBlock _programmableBlock;
         private readonly IMyTextSurface _lcdScreen;
+        protected readonly StringBuilder _lcdOutput = new StringBuilder();
 
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
@@ -57,16 +59,27 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Writes text to the programmable block's LCD screen
+        /// Writes text to the terminal and appends it to the internal buffer
         /// </summary>
         /// <param name="text">Text to display</param>
-        /// <param name="append">Whether to append to existing text</param>
-        public void WriteToLcd(string text, bool append = false)
+        public void AppendText(string text)
         {
             if (IsFunctional() && _lcdScreen != null)
             {
                 _program.Echo(text);
-                _lcdScreen.WriteText(text, append);
+                _lcdOutput.AppendLine(text);
+            }
+        }
+
+        /// <summary>
+        /// Flushes the accumulated text to the LCD panel and clears the buffer
+        /// </summary>
+        public void FlushTextToScreen()
+        {
+            if (IsFunctional() && _lcdScreen != null)
+            {
+                _lcdScreen.WriteText(_lcdOutput.ToString(), false);
+                _lcdOutput.Clear();
             }
         }
     }

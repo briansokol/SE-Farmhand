@@ -1,5 +1,20 @@
-﻿R e a d m e
------------
+﻿Farmhand 0.3
+2025-09-20
+------------
 
-In this file you can include any instructions or other comments you want to have injected onto the 
-top of your final script. You can safely delete this file if you do not want any such comments.
+This script tracks various blocks related to farm plots to help with automation:
+- Changes the lights on the farm plots to indicate the status of the crop
+- Flashes the plot light when the water is low
+- Tracks the amount of ice in irrigation systems
+- Tracks the air/pressurization status using an air vent
+- Triggers timer blocks when certain events occur
+
+Setup:
+- Add the blocks you want to track to a group:
+  - Farm Plots
+  - Irrigation Systems
+  - LCD Panels (Only full panels, blocks with multiple screens aren't yet supported)
+  - Air Vents (You can add more than one, but it will only use the first one it finds)
+  - Timer Blocks
+- Set the group name in this programmable block's Custom Data
+- Configure blocks by changing options in their Custom Data

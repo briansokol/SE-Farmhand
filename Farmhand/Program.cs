@@ -1,6 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Security.Cryptography;
-using System.Text;
 using Sandbox.ModAPI.Ingame;
 using SpaceEngineers.Game.ModAPI.Ingame;
 using VRageMath;
@@ -13,9 +11,6 @@ namespace IngameScript
         readonly Color plantedAliveColor = new Color(255, 255, 255);
         readonly Color plantedReadyColor = new Color(0, 255, 185);
         readonly Color plantedDeadColor = new Color(255, 0, 100);
-
-        readonly StringBuilder mainOutput = new StringBuilder();
-        readonly StringBuilder diagnosticOutput = new StringBuilder();
 
         readonly List<FarmPlot> farmPlots = new List<FarmPlot>();
         readonly List<IrrigationSystem> irrigationSystems = new List<IrrigationSystem>();
@@ -34,28 +29,22 @@ namespace IngameScript
 
         public void Save() { }
 
-        public void Main(string argument, UpdateType updateSource)
+        public void Main()
         {
-            // Main Logic Loop
-            if ((updateSource & UpdateType.Update100) != 0)
+            if (runNumber == 0)
             {
-                diagnosticOutput.Clear();
-                mainOutput.Clear();
-                PrintHeader();
-
-                if (runNumber == 1)
-                {
-                    FindBlocks();
-                }
-
-                diagnosticOutput.AppendLine($"Farm Plots: {farmPlots.Count}");
-                diagnosticOutput.AppendLine($"Irrigation Systems: {irrigationSystems.Count}");
-                diagnosticOutput.AppendLine($"LCD Panels: {lcdPanels.Count}");
-                diagnosticOutput.AppendLine($"Air Vents: {airVents.Count}");
-
-                GetBlockState();
-                PrintOutput();
+                FindBlocks();
             }
+
+            PrintHeader();
+
+            WriteToDiagnosticOutput($"Farm Plots: {farmPlots.Count}");
+            WriteToDiagnosticOutput($"Irrigation Systems: {irrigationSystems.Count}");
+            WriteToDiagnosticOutput($"LCD Panels: {lcdPanels.Count}");
+            WriteToDiagnosticOutput($"Air Vents: {airVents.Count}");
+
+            GetBlockState();
+            PrintOutput();
         }
 
         void FindBlocks()
@@ -74,9 +63,7 @@ namespace IngameScript
             // Find the farm plots in the group
             List<IMyFunctionalBlock> validFarmPlots = new List<IMyFunctionalBlock>();
             group?.GetBlocksOfType(validFarmPlots, block => FarmPlot.BlockIsValid(block));
-            validFarmPlots.ForEach(block =>
-                farmPlots.Add(new FarmPlot(block, this, diagnosticOutput))
-            );
+            validFarmPlots.ForEach(block => farmPlots.Add(new FarmPlot(block, this)));
 
             // Find the irrigation systems in the group
             List<IMyGasGenerator> validIrrigationSystems = new List<IMyGasGenerator>();
@@ -129,23 +116,17 @@ namespace IngameScript
                             {
                                 // Plant is ready to harvest
                                 farmPlot.SetLightColor(plantedReadyColor);
-                                farmPlot.LightBlinkInterval = 3f;
-                                farmPlot.LightBlinkLength = 90f;
                             }
                             else
                             {
                                 // Plant is still growing
                                 farmPlot.SetLightColor(plantedAliveColor);
-                                farmPlot.LightBlinkInterval = 0f;
-                                farmPlot.LightBlinkLength = 1f;
                             }
                         }
                         else
                         {
                             // Plant is dead
                             farmPlot.SetLightColor(plantedDeadColor);
-                            farmPlot.LightBlinkInterval = 0f;
-                            farmPlot.LightBlinkLength = 1f;
                             deadPlants++;
                         }
                     }
@@ -153,8 +134,6 @@ namespace IngameScript
                     {
                         // No plant
                         farmPlot.SetLightColor(planterEmptyColor);
-                        farmPlot.LightBlinkInterval = 0f;
-                        farmPlot.LightBlinkLength = 1f;
                         seedsNeeded += farmPlot.SeedsNeeded;
                     }
 
@@ -167,8 +146,9 @@ namespace IngameScript
                     {
                         farmPlot.LightBlinkInterval = 1f;
                         farmPlot.LightBlinkLength = 50f;
-                        mainOutput.AppendLine(
-                            $"{farmPlot.CustomName}: Water Low: {farmPlot.WaterFilledRatio:P0}"
+                        WriteToMainOutput(
+                            $"{farmPlot.CustomName}: Water Low: {farmPlot.WaterFilledRatio:P0}",
+                            "ShowErrors"
                         );
                     }
                 });
@@ -176,7 +156,7 @@ namespace IngameScript
                 // Check air vents
                 if (airVents.Count > 0)
                 {
-                    mainOutput.AppendLine("Atmosphere");
+                    WriteToMainOutput("Atmosphere", "ShowAtmosphere");
 
                     var vent = airVents[0];
 
@@ -184,29 +164,36 @@ namespace IngameScript
                     {
                         case VentStatus.Pressurizing:
                         case VentStatus.Pressurized:
-                            mainOutput.AppendLine($"  Pressurized: {vent.OxygenLevel:P0}");
+                            WriteToMainOutput(
+                                $"  Pressurized: {vent.OxygenLevel:P0}",
+                                "ShowAtmosphere"
+                            );
                             break;
                         case VentStatus.Depressurizing:
                         case VentStatus.Depressurized:
                             if (vent.CanPressurize)
                             {
-                                mainOutput.AppendLine(
-                                    $"  Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}"
+                                WriteToMainOutput(
+                                    $"  Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}",
+                                    "ShowAtmosphere"
                                 );
                             }
                             else
                             {
-                                mainOutput.AppendLine($"  Depressurized: {vent.OxygenLevel:P0}");
+                                WriteToMainOutput(
+                                    $"  Depressurized: {vent.OxygenLevel:P0}",
+                                    "ShowAtmosphere"
+                                );
                             }
                             break;
                     }
-                    mainOutput.AppendLine("");
+                    WriteToMainOutput("", "ShowAtmosphere");
                 }
 
                 // Check irrigation systems
                 if (irrigationSystems.Count > 0)
                 {
-                    mainOutput.AppendLine("Irrigation Systems");
+                    WriteToMainOutput("Irrigation Systems", "ShowIrrigation");
 
                     float iceVolume = 0f;
                     float inventoryVolume = 0f;
@@ -217,72 +204,72 @@ namespace IngameScript
                         inventoryVolume += irrigationSystem.MaxVolume;
                     });
 
-                    mainOutput.AppendLine($"  Ice: {(iceVolume / inventoryVolume):P0}");
-                    mainOutput.AppendLine("");
+                    WriteToMainOutput($"  Ice: {iceVolume / inventoryVolume:P0}", "ShowIrrigation");
+                    WriteToMainOutput("", "ShowIrrigation");
                 }
 
                 // Final Summary
                 if (seedsNeeded > 0 || deadPlants > 0 || yieldSummary.Count > 0)
                 {
-                    mainOutput.AppendLine("Yield");
+                    WriteToMainOutput("Yield", "ShowYield");
                     if (seedsNeeded > 0)
                     {
-                        mainOutput.AppendLine($"  Available: {seedsNeeded}");
+                        WriteToMainOutput($"  Available: {seedsNeeded}", "ShowYield");
                     }
                     if (deadPlants > 0)
                     {
-                        mainOutput.AppendLine($"  Dead Plants: {deadPlants}");
+                        WriteToMainOutput($"  Dead Plants: {deadPlants}", "ShowYield");
                     }
                     if (yieldSummary.Count > 0)
                     {
                         foreach (KeyValuePair<string, int> entry in yieldSummary)
                         {
-                            mainOutput.AppendLine($"  {entry.Key} Ready: {entry.Value}");
+                            WriteToMainOutput($"  {entry.Key} Ready: {entry.Value}", "ShowYield");
                         }
                     }
-                    mainOutput.AppendLine("");
+                    WriteToMainOutput("", "ShowYield");
                 }
             }
         }
 
         void PrintOutput()
         {
-            thisPb.WriteToLcd(diagnosticOutput.ToString());
+            thisPb.FlushTextToScreen();
 
             if (lcdPanels.Count > 0)
             {
                 lcdPanels.ForEach(panel =>
                 {
-                    panel.WriteText(mainOutput.ToString());
+                    panel.FlushTextToScreen();
                 });
             }
         }
 
         void PrintHeader()
         {
+            string header = "";
             switch (runNumber)
             {
                 case 0:
-                    diagnosticOutput.AppendLine($"Farmhand - {runNumber}");
-                    mainOutput.AppendLine("Farmhand -");
+                    header = $"Farmhand - {runNumber}";
                     break;
                 case 1:
-                    diagnosticOutput.AppendLine($"Farmhand \\ {runNumber}");
-                    mainOutput.AppendLine("Farmhand \\");
+                    header = $"Farmhand \\ {runNumber}";
                     break;
                 case 2:
-                    diagnosticOutput.AppendLine($"Farmhand | {runNumber}");
-                    mainOutput.AppendLine("Farmhand |");
+                    header = $"Farmhand | {runNumber}";
                     break;
                 case 3:
-                    diagnosticOutput.AppendLine($"Farmhand / {runNumber}");
-                    mainOutput.AppendLine("Farmhand /");
+                    header = $"Farmhand / {runNumber}";
                     break;
             }
 
-            diagnosticOutput.AppendLine($"Group: {groupName}");
-            diagnosticOutput.AppendLine("");
-            mainOutput.AppendLine("");
+            WriteToDiagnosticOutput(header);
+            WriteToDiagnosticOutput($"Group: {groupName}");
+            WriteToDiagnosticOutput("");
+
+            WriteToMainOutput(header);
+            WriteToMainOutput("");
 
             if (runNumber >= 3)
             {
@@ -292,6 +279,22 @@ namespace IngameScript
             {
                 runNumber += 1;
             }
+        }
+
+        void WriteToMainOutput(string text, string category = null)
+        {
+            if (lcdPanels.Count > 0)
+            {
+                lcdPanels.ForEach(panel =>
+                {
+                    panel.AppendText(text, category);
+                });
+            }
+        }
+
+        void WriteToDiagnosticOutput(string text)
+        {
+            thisPb.AppendText(text);
         }
     }
 }

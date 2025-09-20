@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
 
@@ -7,8 +8,7 @@ namespace IngameScript
     internal class LcdPanel : Block
     {
         private readonly IMyTextPanel _lcdPanel;
-
-        protected override IMyFunctionalBlock BlockInstance => _lcdPanel;
+        protected readonly StringBuilder _lcdOutput = new StringBuilder();
 
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
@@ -21,6 +21,7 @@ namespace IngameScript
             { "ShowErrors", new CustomDataConfig("Show Errors", "true") },
         };
 
+        protected override IMyFunctionalBlock BlockInstance => _lcdPanel;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs =>
             _customDataConfigs;
 
@@ -38,15 +39,50 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Writes text to the LCD panel
+        /// Writes text to the internal buffer if the category is set to be visible
         /// </summary>
         /// <param name="text">Text to display</param>
-        /// <param name="append">Whether to append to existing text</param>
-        public void WriteText(string text, bool append = false)
+        /// <param name="category">The category of the text</param>
+        public void AppendText(string text, string category = null)
         {
             if (IsFunctional() && _lcdPanel != null)
             {
-                _lcdPanel.WriteText(text, append);
+                if (category == null || IsCategoryVisible(category))
+                {
+                    _lcdOutput.AppendLine(text);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Flushes the accumulated text to the LCD panel and clears the buffer
+        /// </summary>
+        public void FlushTextToScreen()
+        {
+            if (IsFunctional() && _lcdPanel != null)
+            {
+                _lcdPanel.WriteText(_lcdOutput.ToString(), false);
+                _lcdOutput.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Checks if a specific category is set to be visible on the LCD panel
+        /// </summary>
+        /// <param name="category">The category to check</param>
+        /// <returns>True if the category is set to be visible</returns>
+        public bool IsCategoryVisible(string category)
+        {
+            try
+            {
+                ParseCustomData();
+                return _customData
+                    .Get(_customDataHeader, _customDataConfigs[category].Label)
+                    .ToBoolean(false);
+            }
+            catch
+            {
+                return false;
             }
         }
 

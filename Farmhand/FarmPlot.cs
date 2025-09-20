@@ -18,7 +18,6 @@ namespace IngameScript
         /// </summary>
         public const float DefaultLightRadius = 2.5f;
 
-        private readonly StringBuilder _diagnosticOutput;
         private readonly IMyFunctionalBlock _farmPlot;
         private readonly IMyFarmPlotLogic _farmPlotLogic;
         private readonly IMyLightingComponent _lightingComponent;
@@ -33,15 +32,10 @@ namespace IngameScript
         /// <param name="farmPlot">The Space Engineers farm plot block to wrap</param>
         /// <param name="program">The parent grid program instance</param>
         /// <param name="diagnosticOutput">StringBuilder for diagnostic output</param>
-        public FarmPlot(
-            IMyFunctionalBlock farmPlot,
-            MyGridProgram program,
-            StringBuilder diagnosticOutput
-        )
+        public FarmPlot(IMyFunctionalBlock farmPlot, MyGridProgram program)
             : base(program)
         {
             _farmPlot = farmPlot;
-            _diagnosticOutput = diagnosticOutput;
 
             foreach (MyComponentBase comp in _farmPlot.Components)
             {
@@ -59,13 +53,6 @@ namespace IngameScript
                 {
                     _storageComponent = comp as IMyResourceStorageComponent;
                 }
-            }
-
-            if (_farmPlotLogic == null)
-            {
-                _diagnosticOutput.AppendLine(
-                    $"ERROR: Farm Plot '{_farmPlot.CustomName}' is missing IMyFarmPlotLogic component"
-                );
             }
         }
 
