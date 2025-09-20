@@ -60,12 +60,17 @@ The project follows a component-based architecture with a base `Block` class tha
   - `LcdPanel.cs`: Controls text display panels
   - `AirVent.cs`: Monitors atmospheric conditions
   - `ProgrammableBlock.cs`: Self-referential block for configuration
+  - `Timer.cs`: Event-driven timer automation with state-based triggering
+- **Support Classes**: Core system management components
+  - `StateManager.cs`: State change detection and timer event coordination
 
 ### Key Design Patterns
 
 1. **Component Pattern**: Each block type wraps Space Engineers API interfaces with custom logic
 2. **Template Method**: Base `Block` class defines common operations (validation, custom data parsing)
 3. **State Management**: Main program loop monitors and updates all connected blocks every 100 ticks
+4. **Event-Driven Automation**: Timer blocks trigger actions based on state changes using observer pattern
+5. **Configuration-Based Behavior**: Timer events configured via custom data INI settings
 
 ### Custom Data System
 
@@ -74,6 +79,35 @@ The project uses Space Engineers' custom data feature for configuration. All blo
 - Configuration stored in INI format in block custom data
 - Header: `[Farmhand]`
 - Automatic parsing and validation on each update cycle
+
+### Automation and Event System
+
+The project implements a sophisticated event-driven automation system using Timer blocks and StateManager:
+
+#### Timer Event Configuration
+
+Timer blocks support multiple event triggers configured via custom data:
+- **OnWaterLowTrue/False**: Responds to farm plot water levels
+- **OnIceLowTrue/False**: Responds to irrigation system ice levels
+- **OnPressurizedTrue/False**: Responds to air vent pressure changes
+- **OnCropReadyTrue/False**: Responds to harvest-ready crops
+- **OnCropDeadTrue/False**: Responds to dead crops
+- **OnCropAvailableTrue/False**: Responds to crops available for harvest
+- **TriggerNow**: Controls immediate vs. countdown triggering
+
+#### State Change Detection
+
+The `StateManager` class provides:
+- **State Tracking**: Monitors boolean states across update cycles
+- **Change Detection**: Only triggers events when states actually change
+- **Event Coordination**: Automatically triggers appropriate timer events
+- **Multi-Timer Support**: Can manage multiple timer blocks simultaneously
+
+#### Event Naming Convention
+
+Events follow a consistent pattern: `{StateName}{True|False}`
+- State changes from false→true trigger `{StateName}True` events
+- State changes from true→false trigger `{StateName}False` events
 
 ## Development Workflow
 

@@ -17,6 +17,8 @@ namespace IngameScript
         readonly List<LcdPanel> lcdPanels = new List<LcdPanel>();
         readonly List<AirVent> airVents = new List<AirVent>();
 
+        readonly StateManager stateManager = new StateManager();
+
         readonly ProgrammableBlock thisPb;
         int runNumber = 0;
         string groupName = "";
@@ -42,6 +44,7 @@ namespace IngameScript
             WriteToDiagnosticOutput($"Irrigation Systems: {irrigationSystems.Count}");
             WriteToDiagnosticOutput($"LCD Panels: {lcdPanels.Count}");
             WriteToDiagnosticOutput($"Air Vents: {airVents.Count}");
+            WriteToDiagnosticOutput($"Timers: {stateManager.RegisteredTimerCount}");
 
             GetBlockState();
             PrintOutput();
@@ -56,6 +59,7 @@ namespace IngameScript
             irrigationSystems.Clear();
             lcdPanels.Clear();
             airVents.Clear();
+            stateManager.ClearTimers();
 
             // Find the block group by name
             IMyBlockGroup group = GridTerminalSystem.GetBlockGroupWithName(groupName);
@@ -84,6 +88,11 @@ namespace IngameScript
             List<IMyAirVent> validAirVents = new List<IMyAirVent>();
             group?.GetBlocksOfType(validAirVents, block => AirVent.BlockIsValid(block));
             validAirVents.ForEach(block => airVents.Add(new AirVent(block, this)));
+
+            //Find the timers in the group
+            List<IMyTimerBlock> validTimers = new List<IMyTimerBlock>();
+            group?.GetBlocksOfType(validTimers, block => Timer.BlockIsValid(block));
+            validTimers.ForEach(block => stateManager.RegisterTimer(new Timer(block, this)));
         }
 
         void GetBlockState()
@@ -92,9 +101,17 @@ namespace IngameScript
             int deadPlants = 0;
             Dictionary<string, int> yieldSummary = new Dictionary<string, int>();
 
+            List<string> atmosphereMessages = new List<string>();
+            List<string> irrigationMessages = new List<string>();
+            List<string> yieldMessages = new List<string>();
+            List<string> alertMessages = new List<string>();
+
             // Check farm plots
             if (farmPlots.Count > 0)
             {
+                var farmPlotsLowOnWater = 0;
+                var farmPlotsReadyToHarvest = 0;
+
                 farmPlots.ForEach(farmPlot =>
                 {
                     var plantType = farmPlot.PlantType;
@@ -116,6 +133,7 @@ namespace IngameScript
                             {
                                 // Plant is ready to harvest
                                 farmPlot.SetLightColor(plantedReadyColor);
+                                farmPlotsReadyToHarvest++;
                             }
                             else
                             {
@@ -137,7 +155,7 @@ namespace IngameScript
                         seedsNeeded += farmPlot.SeedsNeeded;
                     }
 
-                    if (farmPlot.WaterFilledRatio > 0.2)
+                    if (farmPlot.WaterFilledRatio > 0.2f)
                     {
                         farmPlot.LightBlinkInterval = 0f;
                         farmPlot.LightBlinkLength = 1f;
@@ -146,55 +164,47 @@ namespace IngameScript
                     {
                         farmPlot.LightBlinkInterval = 1f;
                         farmPlot.LightBlinkLength = 50f;
-                        WriteToMainOutput(
-                            $"{farmPlot.CustomName}: Water Low: {farmPlot.WaterFilledRatio:P0}",
-                            "ShowErrors"
+                        alertMessages.Add(
+                            $"  {farmPlot.CustomName} Water Low: {farmPlot.WaterFilledRatio:P1}"
                         );
+                        farmPlotsLowOnWater++;
                     }
                 });
+
+                stateManager.UpdateState("OnWaterLow", farmPlotsLowOnWater > 0);
 
                 // Check air vents
                 if (airVents.Count > 0)
                 {
-                    WriteToMainOutput("Atmosphere", "ShowAtmosphere");
-
                     var vent = airVents[0];
 
                     switch (vent.Status)
                     {
                         case VentStatus.Pressurizing:
                         case VentStatus.Pressurized:
-                            WriteToMainOutput(
-                                $"  Pressurized: {vent.OxygenLevel:P0}",
-                                "ShowAtmosphere"
-                            );
+                            atmosphereMessages.Add($"  Pressurized: {vent.OxygenLevel:P0}");
+                            stateManager.UpdateState("OnPressurized", true);
                             break;
                         case VentStatus.Depressurizing:
                         case VentStatus.Depressurized:
                             if (vent.CanPressurize)
                             {
-                                WriteToMainOutput(
-                                    $"  Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}",
-                                    "ShowAtmosphere"
+                                atmosphereMessages.Add(
+                                    $"  Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}"
                                 );
                             }
                             else
                             {
-                                WriteToMainOutput(
-                                    $"  Depressurized: {vent.OxygenLevel:P0}",
-                                    "ShowAtmosphere"
-                                );
+                                atmosphereMessages.Add($"  Depressurized: {vent.OxygenLevel:P0}");
                             }
+                            stateManager.UpdateState("OnPressurized", false);
                             break;
                     }
-                    WriteToMainOutput("", "ShowAtmosphere");
                 }
 
                 // Check irrigation systems
                 if (irrigationSystems.Count > 0)
                 {
-                    WriteToMainOutput("Irrigation Systems", "ShowIrrigation");
-
                     float iceVolume = 0f;
                     float inventoryVolume = 0f;
 
@@ -204,31 +214,67 @@ namespace IngameScript
                         inventoryVolume += irrigationSystem.MaxVolume;
                     });
 
-                    WriteToMainOutput($"  Ice: {iceVolume / inventoryVolume:P0}", "ShowIrrigation");
-                    WriteToMainOutput("", "ShowIrrigation");
+                    var iceLowThreshold = 0.2f;
+                    var iceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
+                    irrigationMessages.Add($"  Ice: {iceRatio:P0}");
+
+                    stateManager.UpdateState("OnIceLow", iceRatio < iceLowThreshold);
                 }
 
                 // Final Summary
                 if (seedsNeeded > 0 || deadPlants > 0 || yieldSummary.Count > 0)
                 {
-                    WriteToMainOutput("Yield", "ShowYield");
                     if (seedsNeeded > 0)
                     {
-                        WriteToMainOutput($"  Available: {seedsNeeded}", "ShowYield");
+                        yieldMessages.Add($"  Available: {seedsNeeded}");
                     }
+                    stateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
+
                     if (deadPlants > 0)
                     {
-                        WriteToMainOutput($"  Dead Plants: {deadPlants}", "ShowYield");
+                        yieldMessages.Add($"  Dead Plants: {deadPlants}");
                     }
+                    stateManager.UpdateState("OnCropDead", deadPlants > 0);
+
+                    yieldMessages.Add($"  Harvestable Crops: {farmPlotsReadyToHarvest}");
+
                     if (yieldSummary.Count > 0)
                     {
                         foreach (KeyValuePair<string, int> entry in yieldSummary)
                         {
-                            WriteToMainOutput($"  {entry.Key} Ready: {entry.Value}", "ShowYield");
+                            yieldMessages.Add($"  Expected {entry.Key}: {entry.Value}");
                         }
                     }
-                    WriteToMainOutput("", "ShowYield");
+                    stateManager.UpdateState("OnCropReady", farmPlotsReadyToHarvest > 0);
                 }
+            }
+
+            if (alertMessages.Count > 0)
+            {
+                WriteToMainOutput("Alerts", "ShowErrors");
+                alertMessages.ForEach(message => WriteToMainOutput(message, "ShowErrors"));
+                WriteToMainOutput("", "ShowErrors");
+            }
+
+            if (atmosphereMessages.Count > 0)
+            {
+                WriteToMainOutput("Atmosphere", "ShowAtmosphere");
+                atmosphereMessages.ForEach(message => WriteToMainOutput(message, "ShowAtmosphere"));
+                WriteToMainOutput("", "ShowAtmosphere");
+            }
+
+            if (irrigationMessages.Count > 0)
+            {
+                WriteToMainOutput("Irrigation", "ShowIrrigation");
+                irrigationMessages.ForEach(message => WriteToMainOutput(message, "ShowIrrigation"));
+                WriteToMainOutput("", "ShowIrrigation");
+            }
+
+            if (yieldMessages.Count > 0)
+            {
+                WriteToMainOutput("Yield", "ShowYield");
+                yieldMessages.ForEach(message => WriteToMainOutput(message, "ShowYield"));
+                WriteToMainOutput("", "ShowYield");
             }
         }
 
@@ -251,16 +297,16 @@ namespace IngameScript
             switch (runNumber)
             {
                 case 0:
-                    header = $"Farmhand - {runNumber}";
+                    header = "Farmhand -";
                     break;
                 case 1:
-                    header = $"Farmhand \\ {runNumber}";
+                    header = "Farmhand \\";
                     break;
                 case 2:
-                    header = $"Farmhand | {runNumber}";
+                    header = "Farmhand |";
                     break;
                 case 3:
-                    header = $"Farmhand / {runNumber}";
+                    header = "Farmhand /";
                     break;
             }
 

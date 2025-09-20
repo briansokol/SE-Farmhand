@@ -17,6 +17,14 @@ namespace IngameScript
         >()
         {
             {
+                "TriggerNow",
+                new CustomDataConfig(
+                    "Trigger Immediately",
+                    "true",
+                    "Timer will trigger immediately instead of counting down"
+                )
+            },
+            {
                 "OnWaterLowTrue",
                 new CustomDataConfig(
                     "On Water Low",
@@ -65,7 +73,7 @@ namespace IngameScript
                 )
             },
             {
-                "OnCropReady",
+                "OnCropReadyTrue",
                 new CustomDataConfig(
                     "On Crop Ready",
                     "false",
@@ -73,7 +81,15 @@ namespace IngameScript
                 )
             },
             {
-                "OnCropDead",
+                "OnCropReadyFalse",
+                new CustomDataConfig(
+                    "On Crop Not Ready",
+                    "false",
+                    "Triggers when no farm plots are ready for harvest"
+                )
+            },
+            {
+                "OnCropDeadTrue",
                 new CustomDataConfig(
                     "On Crop Dead",
                     "false",
@@ -81,11 +97,27 @@ namespace IngameScript
                 )
             },
             {
-                "OnCropAvailable",
+                "OnCropDeadFalse",
+                new CustomDataConfig(
+                    "On Crop Not Dead",
+                    "false",
+                    "Triggers when no farm plots have dead crops"
+                )
+            },
+            {
+                "OnCropAvailableTrue",
                 new CustomDataConfig(
                     "On Crop Available",
                     "false",
                     "Triggers when a farm plot crop is available for harvest"
+                )
+            },
+            {
+                "OnCropAvailableFalse",
+                new CustomDataConfig(
+                    "On Crop Not Available",
+                    "false",
+                    "Triggers when no farm plots have crops available for harvest"
                 )
             },
         };
@@ -114,7 +146,14 @@ namespace IngameScript
         {
             if (IsFunctional() && ShouldTrigger(theEvent))
             {
-                _timerBlock.StartCountdown();
+                if (ShouldTrigger("TriggerNow"))
+                {
+                    _timerBlock.Trigger();
+                }
+                else
+                {
+                    _timerBlock.StartCountdown();
+                }
             }
         }
 
