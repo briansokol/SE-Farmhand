@@ -12,12 +12,14 @@ namespace IngameScript
         private readonly IMyGasGenerator _irrigationSystem;
         private readonly IMyInventory _inventory;
 
-        private readonly Dictionary<string, string> _customDataEntries =
-            new Dictionary<string, string>();
-
         protected override IMyFunctionalBlock BlockInstance => _irrigationSystem;
-        protected override Dictionary<string, string> CustomDataEntries => _customDataEntries;
+        protected override Dictionary<string, CustomDataConfig> CustomDataConfigs => null;
 
+        /// <summary>
+        /// Initializes a new instance of the IrrigationSystem class
+        /// </summary>
+        /// <param name="irrigationSystem">The Space Engineers gas generator block to use as irrigation system</param>
+        /// <param name="program">The parent grid program instance</param>
         public IrrigationSystem(IMyGasGenerator irrigationSystem, MyGridProgram program)
             : base(program)
         {
@@ -26,19 +28,32 @@ namespace IngameScript
             foreach (MyComponentBase comp in _irrigationSystem.Components)
             {
                 if (_inventory == null)
+                {
                     _inventory = comp as IMyInventory;
+                }
             }
         }
 
+        /// <summary>
+        /// Gets the current volume of ice in the irrigation system
+        /// </summary>
         public float CurrentVolume =>
             IsFunctional() && _inventory != null ? (float)_inventory.CurrentVolume : 0f;
 
+        /// <summary>
+        /// Gets the maximum storage capacity of the irrigation system
+        /// </summary>
         public float MaxVolume =>
             IsFunctional() && _inventory != null ? (float)_inventory.MaxVolume : 0f;
 
+        /// <summary>
+        /// Validates whether a gas generator block can be used as an irrigation system
+        /// </summary>
+        /// <param name="block">The gas generator block to validate</param>
+        /// <returns>True if the block can be used as an irrigation system</returns>
         public static bool BlockIsValid(IMyGasGenerator block)
         {
-            if (!IsValid(block))
+            if (!IsBlockValid(block))
             {
                 return false;
             }

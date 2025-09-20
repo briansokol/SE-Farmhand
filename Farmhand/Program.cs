@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using SpaceEngineers.Game.ModAPI.Ingame;
@@ -23,6 +24,7 @@ namespace IngameScript
 
         readonly ProgrammableBlock thisPb;
         int runNumber = 0;
+        string groupName = "";
 
         public Program()
         {
@@ -39,7 +41,6 @@ namespace IngameScript
             {
                 diagnosticOutput.Clear();
                 mainOutput.Clear();
-                thisPb.ParseCustomData();
                 PrintHeader();
 
                 if (runNumber == 1)
@@ -59,7 +60,7 @@ namespace IngameScript
 
         void FindBlocks()
         {
-            var groupName = thisPb.GroupName;
+            groupName = thisPb.GroupName;
 
             // Clear existing lists
             farmPlots.Clear();
@@ -112,8 +113,8 @@ namespace IngameScript
                     var plantType = farmPlot.PlantType;
                     var plantYield = farmPlot.PlantYieldAmount;
 
-                    farmPlot.LightIntensity = 2.0f;
-                    farmPlot.LightRadius = 2.5f;
+                    farmPlot.LightIntensity = FarmPlot.DefaultLightIntensity;
+                    farmPlot.LightRadius = FarmPlot.DefaultLightRadius;
 
                     if (farmPlot.IsPlantPlanted)
                     {
@@ -262,32 +263,28 @@ namespace IngameScript
             switch (runNumber)
             {
                 case 0:
-                case 4:
-                    diagnosticOutput.AppendLine($"Farm Manager - {runNumber}");
-                    mainOutput.AppendLine("Farm Manager -");
+                    diagnosticOutput.AppendLine($"Farmhand - {runNumber}");
+                    mainOutput.AppendLine("Farmhand -");
                     break;
                 case 1:
-                case 5:
-                    diagnosticOutput.AppendLine($"Farm Manager \\ {runNumber}");
-                    mainOutput.AppendLine("Farm Manager \\");
+                    diagnosticOutput.AppendLine($"Farmhand \\ {runNumber}");
+                    mainOutput.AppendLine("Farmhand \\");
                     break;
                 case 2:
-                case 6:
-                    diagnosticOutput.AppendLine($"Farm Manager | {runNumber}");
-                    mainOutput.AppendLine("Farm Manager |");
+                    diagnosticOutput.AppendLine($"Farmhand | {runNumber}");
+                    mainOutput.AppendLine("Farmhand |");
                     break;
                 case 3:
-                case 7:
-                    diagnosticOutput.AppendLine($"Farm Manager / {runNumber}");
-                    mainOutput.AppendLine("Farm Manager /");
+                    diagnosticOutput.AppendLine($"Farmhand / {runNumber}");
+                    mainOutput.AppendLine("Farmhand /");
                     break;
             }
 
-            diagnosticOutput.AppendLine($"Group: {thisPb.GroupName}");
+            diagnosticOutput.AppendLine($"Group: {groupName}");
             diagnosticOutput.AppendLine("");
             mainOutput.AppendLine("");
 
-            if (runNumber >= 7)
+            if (runNumber >= 3)
             {
                 runNumber = 0;
             }

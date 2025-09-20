@@ -12,3 +12,6 @@
 
 # AI Tools
 .claude/*local*
+
+# F#
+.fake
