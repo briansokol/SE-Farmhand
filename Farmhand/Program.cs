@@ -7,11 +7,6 @@ namespace IngameScript
 {
     public partial class Program : MyGridProgram
     {
-        readonly Color planterEmptyColor = new Color(80, 0, 170);
-        readonly Color plantedAliveColor = new Color(255, 255, 255);
-        readonly Color plantedReadyColor = new Color(0, 255, 185);
-        readonly Color plantedDeadColor = new Color(255, 0, 100);
-
         readonly List<FarmPlot> farmPlots = new List<FarmPlot>();
         readonly List<IrrigationSystem> irrigationSystems = new List<IrrigationSystem>();
         readonly List<LcdPanel> lcdPanels = new List<LcdPanel>();
@@ -117,9 +112,6 @@ namespace IngameScript
                     var plantType = farmPlot.PlantType;
                     var plantYield = farmPlot.PlantYieldAmount;
 
-                    farmPlot.LightIntensity = FarmPlot.DefaultLightIntensity;
-                    farmPlot.LightRadius = FarmPlot.DefaultLightRadius;
-
                     if (farmPlot.IsPlantPlanted)
                     {
                         // Set the yield summary
@@ -132,26 +124,26 @@ namespace IngameScript
                             if (farmPlot.IsPlantFullyGrown)
                             {
                                 // Plant is ready to harvest
-                                farmPlot.SetLightColor(plantedReadyColor);
+                                farmPlot.SetLightColor(thisPb.PlantedReadyColor);
                                 farmPlotsReadyToHarvest++;
                             }
                             else
                             {
                                 // Plant is still growing
-                                farmPlot.SetLightColor(plantedAliveColor);
+                                farmPlot.SetLightColor(thisPb.PlantedAliveColor);
                             }
                         }
                         else
                         {
                             // Plant is dead
-                            farmPlot.SetLightColor(plantedDeadColor);
+                            farmPlot.SetLightColor(thisPb.PlantedDeadColor);
                             deadPlants++;
                         }
                     }
                     else
                     {
                         // No plant
-                        farmPlot.SetLightColor(planterEmptyColor);
+                        farmPlot.SetLightColor(thisPb.PlanterEmptyColor);
                         seedsNeeded += farmPlot.SeedsNeeded;
                     }
 

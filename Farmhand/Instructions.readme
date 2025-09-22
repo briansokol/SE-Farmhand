@@ -4,7 +4,7 @@ By Duke Skyloafer
 ------------
 
 This script tracks various blocks related to farm plots to help with automation:
-  - Changes the lights on the farm plots to indicate the status of the crop
+  - Changes the lights on the farm plots to indicate the status of the crop (configurable):
     - Dark Purple: Nothing planted
     - White: Plant is growing
     - Green: Plant is ready to harvest

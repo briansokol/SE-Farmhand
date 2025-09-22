@@ -8,16 +8,6 @@ namespace IngameScript
 {
     internal class FarmPlot : Block
     {
-        /// <summary>
-        /// Default light intensity for farm plots
-        /// </summary>
-        public const float DefaultLightIntensity = 2.0f;
-
-        /// <summary>
-        /// Default light radius for farm plots
-        /// </summary>
-        public const float DefaultLightRadius = 2.5f;
-
         private readonly IMyFunctionalBlock _farmPlot;
         private readonly IMyFarmPlotLogic _farmPlotLogic;
         private readonly IMyLightingComponent _lightingComponent;
