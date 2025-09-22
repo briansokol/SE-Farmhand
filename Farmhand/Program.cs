@@ -226,7 +226,7 @@ namespace IngameScript
                 {
                     if (seedsNeeded > 0)
                     {
-                        yieldMessages.Add($"  Available: {seedsNeeded}");
+                        yieldMessages.Add($"  Available Plots: {seedsNeeded}");
                     }
                     stateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
 
@@ -236,7 +236,7 @@ namespace IngameScript
                     }
                     stateManager.UpdateState("OnCropDead", deadPlants > 0);
 
-                    yieldMessages.Add($"  Harvestable Crops: {farmPlotsReadyToHarvest}");
+                    yieldMessages.Add($"  Harvestable Plots: {farmPlotsReadyToHarvest}");
 
                     if (yieldSummary.Count > 0)
                     {
