@@ -147,7 +147,7 @@ namespace IngameScript
                         seedsNeeded += farmPlot.SeedsNeeded;
                     }
 
-                    if (farmPlot.WaterFilledRatio > 0.2f)
+                    if (farmPlot.WaterFilledRatio > thisPb.WaterLowThreshold)
                     {
                         farmPlot.LightBlinkInterval = 0f;
                         farmPlot.LightBlinkLength = 1f;
@@ -206,7 +206,7 @@ namespace IngameScript
                         inventoryVolume += irrigationSystem.MaxVolume;
                     });
 
-                    var iceLowThreshold = 0.2f;
+                    var iceLowThreshold = thisPb.IceLowThreshold;
                     var iceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
                     irrigationMessages.Add($"  Ice: {iceRatio:P0}");
 

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
@@ -30,7 +31,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "Plot Empty Color",
                     "80,0,170",
-                    "RGB color for empty farm plots (default: purple)"
+                    "RGB color for empty farm plots (default: 80,0,170)"
                 )
             },
             {
@@ -38,7 +39,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "Plant Alive Color",
                     "255,255,255",
-                    "RGB color for growing plants (default: white)"
+                    "RGB color for growing plants (default: 255,255,255)"
                 )
             },
             {
@@ -46,7 +47,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "Plant Ready Color",
                     "0,255,185",
-                    "RGB color for ready-to-harvest plants (default: green)"
+                    "RGB color for ready-to-harvest plants (default: 0,255,185)"
                 )
             },
             {
@@ -54,7 +55,23 @@ namespace IngameScript
                 new CustomDataConfig(
                     "Plant Dead Color",
                     "255,0,100",
-                    "RGB color for dead plants (default: red)"
+                    "RGB color for dead plants (default: 255,0,100)"
+                )
+            },
+            {
+                "IceLowThreshold",
+                new CustomDataConfig(
+                    "Ice Low Threshold",
+                    "0.2",
+                    "Ice level threshold (0.0-1.0) that triggers low ice alerts and events (default: 0.2 = 20%)"
+                )
+            },
+            {
+                "WaterLowThreshold",
+                new CustomDataConfig(
+                    "Water Low Threshold",
+                    "0.2",
+                    "Water level threshold (0.0-1.0) that triggers low water alerts and blinking lights (default: 0.2 = 20%)"
                 )
             },
         };
@@ -152,6 +169,52 @@ namespace IngameScript
                         .Get(_customDataHeader, _customDataConfigs["PlantedDeadColor"].Label)
                         .ToString(_customDataConfigs["PlantedDeadColor"].DefaultValue)
                 );
+            }
+        }
+
+        /// <summary>
+        /// Gets the ice low threshold percentage
+        /// </summary>
+        public float IceLowThreshold
+        {
+            get
+            {
+                ParseCustomData();
+                var thresholdString = _customData
+                    .Get(_customDataHeader, _customDataConfigs["IceLowThreshold"].Label)
+                    .ToString(_customDataConfigs["IceLowThreshold"].DefaultValue);
+
+                float threshold;
+                if (float.TryParse(thresholdString, out threshold))
+                {
+                    // Clamp between 0.0 and 1.0
+                    return Math.Max(0.0f, Math.Min(1.0f, threshold));
+                }
+                // Return default if parsing fails
+                return 0.2f;
+            }
+        }
+
+        /// <summary>
+        /// Gets the water low threshold percentage
+        /// </summary>
+        public float WaterLowThreshold
+        {
+            get
+            {
+                ParseCustomData();
+                var thresholdString = _customData
+                    .Get(_customDataHeader, _customDataConfigs["WaterLowThreshold"].Label)
+                    .ToString(_customDataConfigs["WaterLowThreshold"].DefaultValue);
+
+                float threshold;
+                if (float.TryParse(thresholdString, out threshold))
+                {
+                    // Clamp between 0.0 and 1.0
+                    return Math.Max(0.0f, Math.Min(1.0f, threshold));
+                }
+                // Return default if parsing fails
+                return 0.2f;
             }
         }
 
