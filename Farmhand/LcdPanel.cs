@@ -15,10 +15,19 @@ namespace IngameScript
             CustomDataConfig
         >()
         {
-            { "ShowAtmosphere", new CustomDataConfig("Show Atmosphere", "true") },
-            { "ShowIrrigation", new CustomDataConfig("Show Irrigation", "true") },
-            { "ShowYield", new CustomDataConfig("Show Yield", "true") },
-            { "ShowErrors", new CustomDataConfig("Show Errors", "true") },
+            {
+                "ShowErrors",
+                new CustomDataConfig("Show Alerts", "true", "Shows information requiring attention")
+            },
+            {
+                "ShowAtmosphere",
+                new CustomDataConfig("Show Atmosphere", "true", "Shows atmospheric information")
+            },
+            {
+                "ShowIrrigation",
+                new CustomDataConfig("Show Irrigation", "true", "Shows irrigation system status")
+            },
+            { "ShowYield", new CustomDataConfig("Show Yield", "true", "Shows current crop yield") },
         };
 
         protected override IMyFunctionalBlock BlockInstance => _lcdPanel;

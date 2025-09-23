@@ -1,12 +1,14 @@
 ﻿using System.Collections.Generic;
 using Sandbox.ModAPI.Ingame;
 using SpaceEngineers.Game.ModAPI.Ingame;
-using VRageMath;
 
 namespace IngameScript
 {
     public partial class Program : MyGridProgram
     {
+        readonly string Version = "v0.5";
+        readonly string PublishedDate = "2025-09-22";
+
         readonly List<FarmPlot> farmPlots = new List<FarmPlot>();
         readonly List<IrrigationSystem> irrigationSystems = new List<IrrigationSystem>();
         readonly List<LcdPanel> lcdPanels = new List<LcdPanel>();
@@ -94,6 +96,7 @@ namespace IngameScript
         {
             int seedsNeeded = 0;
             int deadPlants = 0;
+            Dictionary<string, int> plotSummary = new Dictionary<string, int>();
             Dictionary<string, int> yieldSummary = new Dictionary<string, int>();
 
             List<string> atmosphereMessages = new List<string>();
@@ -114,18 +117,23 @@ namespace IngameScript
 
                     if (farmPlot.IsPlantPlanted)
                     {
-                        // Set the yield summary
-                        yieldSummary[plantType] = yieldSummary.ContainsKey(plantType)
-                            ? yieldSummary[plantType] + plantYield
-                            : plantYield;
-
                         if (farmPlot.IsPlantAlive)
                         {
+                            // Set the plot plant count
+                            plotSummary[plantType] = plotSummary.ContainsKey(plantType)
+                                ? plotSummary[plantType] + 1
+                                : 1;
+
                             if (farmPlot.IsPlantFullyGrown)
                             {
                                 // Plant is ready to harvest
                                 farmPlot.SetLightColor(thisPb.PlantedReadyColor);
                                 farmPlotsReadyToHarvest++;
+
+                                // Set the yield summary
+                                yieldSummary[plantType] = yieldSummary.ContainsKey(plantType)
+                                    ? yieldSummary[plantType] + plantYield
+                                    : plantYield;
                             }
                             else
                             {
@@ -213,31 +221,37 @@ namespace IngameScript
                     stateManager.UpdateState("OnIceLow", iceRatio < iceLowThreshold);
                 }
 
-                // Final Summary
-                if (seedsNeeded > 0 || deadPlants > 0 || yieldSummary.Count > 0)
+                // Additional alerts
+                if (deadPlants > 0)
                 {
-                    if (seedsNeeded > 0)
-                    {
-                        yieldMessages.Add($"  Available Plots: {seedsNeeded}");
-                    }
-                    stateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
+                    alertMessages.Add($"  Dead Plants: {deadPlants}");
+                }
+                stateManager.UpdateState("OnCropDead", deadPlants > 0);
 
-                    if (deadPlants > 0)
-                    {
-                        yieldMessages.Add($"  Dead Plants: {deadPlants}");
-                    }
-                    stateManager.UpdateState("OnCropDead", deadPlants > 0);
+                if (seedsNeeded > 0)
+                {
+                    alertMessages.Add($"  Available Plots: {seedsNeeded}");
+                }
+                stateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
 
-                    yieldMessages.Add($"  Harvestable Plots: {farmPlotsReadyToHarvest}");
+                if (farmPlotsReadyToHarvest > 0)
+                {
+                    alertMessages.Add($"  Harvestable Plots: {farmPlotsReadyToHarvest}");
+                }
+                stateManager.UpdateState("OnCropReady", farmPlotsReadyToHarvest > 0);
 
-                    if (yieldSummary.Count > 0)
+                // Yield summary
+                if (plotSummary.Count > 0)
+                {
+                    foreach (KeyValuePair<string, int> entry in plotSummary)
                     {
-                        foreach (KeyValuePair<string, int> entry in yieldSummary)
-                        {
-                            yieldMessages.Add($"  Expected {entry.Key}: {entry.Value}");
-                        }
+                        int plantYield = yieldSummary.ContainsKey(entry.Key)
+                            ? yieldSummary[entry.Key]
+                            : 0;
+                        yieldMessages.Add(
+                            $"  {entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {(plantYield == 0 ? "Growing" : plantYield.ToString())}"
+                        );
                     }
-                    stateManager.UpdateState("OnCropReady", farmPlotsReadyToHarvest > 0);
                 }
             }
 
@@ -264,7 +278,7 @@ namespace IngameScript
 
             if (yieldMessages.Count > 0)
             {
-                WriteToMainOutput("Yield", "ShowYield");
+                WriteToMainOutput("Current Yield", "ShowYield");
                 yieldMessages.ForEach(message => WriteToMainOutput(message, "ShowYield"));
                 WriteToMainOutput("", "ShowYield");
             }
@@ -303,6 +317,7 @@ namespace IngameScript
             }
 
             WriteToDiagnosticOutput(header);
+            WriteToDiagnosticOutput($"Version: {Version} ({PublishedDate})");
             WriteToDiagnosticOutput($"Group: {groupName}");
             WriteToDiagnosticOutput("");
 
