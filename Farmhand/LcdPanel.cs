@@ -16,7 +16,7 @@ namespace IngameScript
         >()
         {
             {
-                "ShowErrors",
+                "ShowAlerts",
                 new CustomDataConfig("Show Alerts", "true", "Shows information requiring attention")
             },
             {

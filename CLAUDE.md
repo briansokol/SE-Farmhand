@@ -153,3 +153,8 @@ Farm plots use integrated lighting to indicate status:
 - **Cyan + Blinking**: Ready to harvest
 - **Red**: Dead plant
 - **Fast Blinking**: Low water warning
+
+### Key Space Engineers API Documentation
+
+- [How to search for blocks on a grid](https://github.com/malware-dev/MDK-SE/wiki/The-Grid-Terminal-System)
+- [How to draw on a text surface with sprites](https://github.com/malware-dev/MDK-SE/wiki/Text-Panels-and-Drawing-Sprites)

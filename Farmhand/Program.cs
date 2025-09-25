@@ -76,10 +76,16 @@ namespace IngameScript
                 irrigationSystems.Add(new IrrigationSystem(block, this))
             );
 
-            // Find the LCD panels in the group
-            List<IMyTextPanel> validLcdPanels = new List<IMyTextPanel>();
-            group?.GetBlocksOfType(validLcdPanels, block => LcdPanel.BlockIsValid(block));
-            validLcdPanels.ForEach(block => lcdPanels.Add(new LcdPanel(block, this)));
+            // Find the LCD panels with [FarmLCD] in their custom name
+            List<IMyTerminalBlock> validLcdPanels = new List<IMyTerminalBlock>();
+            GridTerminalSystem.SearchBlocksOfName(
+                "[FarmLCD]",
+                validLcdPanels,
+                panel => panel is IMyTextPanel && LcdPanel.BlockIsValid(panel as IMyTextPanel)
+            );
+            validLcdPanels.ForEach(block =>
+                lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this))
+            );
 
             // Find the air vents in the group
             List<IMyAirVent> validAirVents = new List<IMyAirVent>();
@@ -257,9 +263,9 @@ namespace IngameScript
 
             if (alertMessages.Count > 0)
             {
-                WriteToMainOutput("Alerts", "ShowErrors");
-                alertMessages.ForEach(message => WriteToMainOutput(message, "ShowErrors"));
-                WriteToMainOutput("", "ShowErrors");
+                WriteToMainOutput("Alerts", "ShowAlerts");
+                alertMessages.ForEach(message => WriteToMainOutput(message, "ShowAlerts"));
+                WriteToMainOutput("", "ShowAlerts");
             }
 
             if (atmosphereMessages.Count > 0)
