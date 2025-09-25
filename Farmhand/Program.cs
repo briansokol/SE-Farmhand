@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using Sandbox.ModAPI.Ingame;
 using SpaceEngineers.Game.ModAPI.Ingame;
 
@@ -9,20 +10,17 @@ namespace IngameScript
         readonly string Version = "v0.5";
         readonly string PublishedDate = "2025-09-22";
 
-        readonly List<FarmPlot> farmPlots = new List<FarmPlot>();
-        readonly List<IrrigationSystem> irrigationSystems = new List<IrrigationSystem>();
-        readonly List<LcdPanel> lcdPanels = new List<LcdPanel>();
-        readonly List<AirVent> airVents = new List<AirVent>();
-
-        readonly StateManager stateManager = new StateManager();
-
+        readonly FarmGroups farmGroups;
         readonly ProgrammableBlock thisPb;
+
+        // readonly List<LcdPanel> LcdPanels = new List<LcdPanel>();
+        // List<string> GroupNames = new List<string>();
         int runNumber = 0;
-        string groupName = "";
 
         public Program()
         {
             thisPb = new ProgrammableBlock(Me, this);
+            farmGroups = new FarmGroups(GridTerminalSystem, this);
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
         }
 
@@ -37,44 +35,28 @@ namespace IngameScript
 
             PrintHeader();
 
-            WriteToDiagnosticOutput($"Farm Plots: {farmPlots.Count}");
-            WriteToDiagnosticOutput($"Irrigation Systems: {irrigationSystems.Count}");
-            WriteToDiagnosticOutput($"LCD Panels: {lcdPanels.Count}");
-            WriteToDiagnosticOutput($"Air Vents: {airVents.Count}");
-            WriteToDiagnosticOutput($"Timers: {stateManager.RegisteredTimerCount}");
-
+            farmGroups
+                .GetAllGroups()
+                .ForEach(farmGroup =>
+                {
+                    WriteToDiagnosticOutput($"Group: {farmGroup.GroupName}");
+                    WriteToDiagnosticOutput($"  Farm Plots: {farmGroup.FarmPlots.Count}");
+                    WriteToDiagnosticOutput(
+                        $"  Irrigation Systems: {farmGroup.IrrigationSystems.Count}"
+                    );
+                    WriteToDiagnosticOutput($"  LCD Panels: {farmGroup.LcdPanels.Count}");
+                    WriteToDiagnosticOutput($"  Air Vents: {farmGroup.AirVents.Count}");
+                    WriteToDiagnosticOutput(
+                        $"  Timers: {farmGroup.StateManager.RegisteredTimerCount}"
+                    );
+                });
             GetBlockState();
             PrintOutput();
         }
 
         void FindBlocks()
         {
-            groupName = thisPb.GroupName;
-
-            // Clear existing lists
-            farmPlots.Clear();
-            irrigationSystems.Clear();
-            lcdPanels.Clear();
-            airVents.Clear();
-            stateManager.ClearTimers();
-
-            // Find the block group by name
-            IMyBlockGroup group = GridTerminalSystem.GetBlockGroupWithName(groupName);
-
-            // Find the farm plots in the group
-            List<IMyFunctionalBlock> validFarmPlots = new List<IMyFunctionalBlock>();
-            group?.GetBlocksOfType(validFarmPlots, block => FarmPlot.BlockIsValid(block));
-            validFarmPlots.ForEach(block => farmPlots.Add(new FarmPlot(block, this)));
-
-            // Find the irrigation systems in the group
-            List<IMyGasGenerator> validIrrigationSystems = new List<IMyGasGenerator>();
-            group?.GetBlocksOfType(
-                validIrrigationSystems,
-                block => IrrigationSystem.BlockIsValid(block)
-            );
-            validIrrigationSystems.ForEach(block =>
-                irrigationSystems.Add(new IrrigationSystem(block, this))
-            );
+            var lcdPanels = new List<LcdPanel>();
 
             // Find the LCD panels with [FarmLCD] in their custom name
             List<IMyTerminalBlock> validLcdPanels = new List<IMyTerminalBlock>();
@@ -87,220 +69,253 @@ namespace IngameScript
                 lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this))
             );
 
-            // Find the air vents in the group
-            List<IMyAirVent> validAirVents = new List<IMyAirVent>();
-            group?.GetBlocksOfType(validAirVents, block => AirVent.BlockIsValid(block));
-            validAirVents.ForEach(block => airVents.Add(new AirVent(block, this)));
+            var groupNames = lcdPanels
+                .ConvertAll(panel => panel.getGroupName())
+                .FindAll(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct()
+                .ToList();
 
-            //Find the timers in the group
-            List<IMyTimerBlock> validTimers = new List<IMyTimerBlock>();
-            group?.GetBlocksOfType(validTimers, block => Timer.BlockIsValid(block));
-            validTimers.ForEach(block => stateManager.RegisterTimer(new Timer(block, this)));
+            farmGroups.RemoveGroupsNotInList(groupNames);
+
+            groupNames.ForEach(groupName =>
+            {
+                var lcdPanelsInGroup = lcdPanels.FindAll(panel =>
+                    panel.getGroupName() == groupName
+                );
+                farmGroups.FindBlocks(groupName, lcdPanelsInGroup);
+            });
         }
 
         void GetBlockState()
         {
-            int seedsNeeded = 0;
-            int deadPlants = 0;
-            Dictionary<string, int> plotSummary = new Dictionary<string, int>();
-            Dictionary<string, int> yieldSummary = new Dictionary<string, int>();
-
-            List<string> atmosphereMessages = new List<string>();
-            List<string> irrigationMessages = new List<string>();
-            List<string> yieldMessages = new List<string>();
-            List<string> alertMessages = new List<string>();
-
-            // Check farm plots
-            if (farmPlots.Count > 0)
-            {
-                var farmPlotsLowOnWater = 0;
-                var farmPlotsReadyToHarvest = 0;
-
-                farmPlots.ForEach(farmPlot =>
+            farmGroups
+                .GetAllGroups()
+                .ForEach(farmGroup =>
                 {
-                    var plantType = farmPlot.PlantType;
-                    var plantYield = farmPlot.PlantYieldAmount;
+                    var groupName = farmGroup.GroupName;
 
-                    if (farmPlot.IsPlantPlanted)
+                    int seedsNeeded = 0;
+                    int deadPlants = 0;
+                    Dictionary<string, int> plotSummary = new Dictionary<string, int>();
+                    Dictionary<string, int> yieldSummary = new Dictionary<string, int>();
+
+                    List<string> atmosphereMessages = new List<string>();
+                    List<string> irrigationMessages = new List<string>();
+                    List<string> yieldMessages = new List<string>();
+                    List<string> alertMessages = new List<string>();
+
+                    // Check farm plots
+                    if (farmGroup.FarmPlots.Count > 0)
                     {
-                        if (farmPlot.IsPlantAlive)
+                        var farmPlotsLowOnWater = 0;
+                        var farmPlotsReadyToHarvest = 0;
+
+                        farmGroup.FarmPlots.ForEach(farmPlot =>
                         {
-                            // Set the plot plant count
-                            plotSummary[plantType] = plotSummary.ContainsKey(plantType)
-                                ? plotSummary[plantType] + 1
-                                : 1;
+                            var plantType = farmPlot.PlantType;
+                            var plantYield = farmPlot.PlantYieldAmount;
 
-                            if (farmPlot.IsPlantFullyGrown)
+                            if (farmPlot.IsPlantPlanted)
                             {
-                                // Plant is ready to harvest
-                                farmPlot.SetLightColor(thisPb.PlantedReadyColor);
-                                farmPlotsReadyToHarvest++;
+                                if (farmPlot.IsPlantAlive)
+                                {
+                                    // Set the plot plant count
+                                    plotSummary[plantType] = plotSummary.ContainsKey(plantType)
+                                        ? plotSummary[plantType] + 1
+                                        : 1;
 
-                                // Set the yield summary
-                                yieldSummary[plantType] = yieldSummary.ContainsKey(plantType)
-                                    ? yieldSummary[plantType] + plantYield
-                                    : plantYield;
+                                    if (farmPlot.IsPlantFullyGrown)
+                                    {
+                                        // Plant is ready to harvest
+                                        farmPlot.SetLightColor(thisPb.PlantedReadyColor);
+                                        farmPlotsReadyToHarvest++;
+
+                                        // Set the yield summary
+                                        yieldSummary[plantType] = yieldSummary.ContainsKey(
+                                            plantType
+                                        )
+                                            ? yieldSummary[plantType] + plantYield
+                                            : plantYield;
+                                    }
+                                    else
+                                    {
+                                        // Plant is still growing
+                                        farmPlot.SetLightColor(thisPb.PlantedAliveColor);
+                                    }
+                                }
+                                else
+                                {
+                                    // Plant is dead
+                                    farmPlot.SetLightColor(thisPb.PlantedDeadColor);
+                                    deadPlants++;
+                                }
                             }
                             else
                             {
-                                // Plant is still growing
-                                farmPlot.SetLightColor(thisPb.PlantedAliveColor);
+                                // No plant
+                                farmPlot.SetLightColor(thisPb.PlanterEmptyColor);
+                                seedsNeeded += farmPlot.SeedsNeeded;
+                            }
+
+                            if (farmPlot.WaterFilledRatio > thisPb.WaterLowThreshold)
+                            {
+                                farmPlot.LightBlinkInterval = 0f;
+                                farmPlot.LightBlinkLength = 1f;
+                            }
+                            else
+                            {
+                                farmPlot.LightBlinkInterval = 1f;
+                                farmPlot.LightBlinkLength = 50f;
+                                alertMessages.Add(
+                                    $"  {farmPlot.CustomName} Water Low: {farmPlot.WaterFilledRatio:P1}"
+                                );
+                                farmPlotsLowOnWater++;
+                            }
+                        });
+
+                        farmGroup.StateManager.UpdateState("OnWaterLow", farmPlotsLowOnWater > 0);
+
+                        // Check air vents
+                        if (farmGroup.AirVents.Count > 0)
+                        {
+                            var vent = farmGroup.AirVents[0];
+
+                            switch (vent.Status)
+                            {
+                                case VentStatus.Pressurizing:
+                                case VentStatus.Pressurized:
+                                    atmosphereMessages.Add($"  Pressurized: {vent.OxygenLevel:P0}");
+                                    farmGroup.StateManager.UpdateState("OnPressurized", true);
+                                    break;
+                                case VentStatus.Depressurizing:
+                                case VentStatus.Depressurized:
+                                    if (vent.CanPressurize)
+                                    {
+                                        atmosphereMessages.Add(
+                                            $"  Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}"
+                                        );
+                                    }
+                                    else
+                                    {
+                                        atmosphereMessages.Add(
+                                            $"  Depressurized: {vent.OxygenLevel:P0}"
+                                        );
+                                    }
+                                    farmGroup.StateManager.UpdateState("OnPressurized", false);
+                                    break;
                             }
                         }
-                        else
+
+                        // Check irrigation systems
+                        if (farmGroup.IrrigationSystems.Count > 0)
                         {
-                            // Plant is dead
-                            farmPlot.SetLightColor(thisPb.PlantedDeadColor);
-                            deadPlants++;
-                        }
-                    }
-                    else
-                    {
-                        // No plant
-                        farmPlot.SetLightColor(thisPb.PlanterEmptyColor);
-                        seedsNeeded += farmPlot.SeedsNeeded;
-                    }
+                            float iceVolume = 0f;
+                            float inventoryVolume = 0f;
 
-                    if (farmPlot.WaterFilledRatio > thisPb.WaterLowThreshold)
-                    {
-                        farmPlot.LightBlinkInterval = 0f;
-                        farmPlot.LightBlinkLength = 1f;
-                    }
-                    else
-                    {
-                        farmPlot.LightBlinkInterval = 1f;
-                        farmPlot.LightBlinkLength = 50f;
-                        alertMessages.Add(
-                            $"  {farmPlot.CustomName} Water Low: {farmPlot.WaterFilledRatio:P1}"
-                        );
-                        farmPlotsLowOnWater++;
-                    }
-                });
-
-                stateManager.UpdateState("OnWaterLow", farmPlotsLowOnWater > 0);
-
-                // Check air vents
-                if (airVents.Count > 0)
-                {
-                    var vent = airVents[0];
-
-                    switch (vent.Status)
-                    {
-                        case VentStatus.Pressurizing:
-                        case VentStatus.Pressurized:
-                            atmosphereMessages.Add($"  Pressurized: {vent.OxygenLevel:P0}");
-                            stateManager.UpdateState("OnPressurized", true);
-                            break;
-                        case VentStatus.Depressurizing:
-                        case VentStatus.Depressurized:
-                            if (vent.CanPressurize)
+                            farmGroup.IrrigationSystems.ForEach(irrigationSystem =>
                             {
-                                atmosphereMessages.Add(
-                                    $"  Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}"
+                                iceVolume += irrigationSystem.CurrentVolume;
+                                inventoryVolume += irrigationSystem.MaxVolume;
+                            });
+
+                            var iceLowThreshold = thisPb.IceLowThreshold;
+                            var iceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
+                            irrigationMessages.Add($"  Ice: {iceRatio:P0}");
+
+                            farmGroup.StateManager.UpdateState(
+                                "OnIceLow",
+                                iceRatio < iceLowThreshold
+                            );
+                        }
+
+                        // Additional alerts
+                        if (deadPlants > 0)
+                        {
+                            alertMessages.Add($"  Dead Plants: {deadPlants}");
+                        }
+                        farmGroup.StateManager.UpdateState("OnCropDead", deadPlants > 0);
+
+                        if (seedsNeeded > 0)
+                        {
+                            alertMessages.Add($"  Available Plots: {seedsNeeded}");
+                        }
+                        farmGroup.StateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
+
+                        if (farmPlotsReadyToHarvest > 0)
+                        {
+                            alertMessages.Add($"  Harvest Ready Plots: {farmPlotsReadyToHarvest}");
+                        }
+                        farmGroup.StateManager.UpdateState(
+                            "OnCropReady",
+                            farmPlotsReadyToHarvest > 0
+                        );
+
+                        // Yield summary
+                        if (plotSummary.Count > 0)
+                        {
+                            foreach (KeyValuePair<string, int> entry in plotSummary)
+                            {
+                                int plantYield = yieldSummary.ContainsKey(entry.Key)
+                                    ? yieldSummary[entry.Key]
+                                    : 0;
+                                yieldMessages.Add(
+                                    $"  {entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {(plantYield == 0 ? "Growing" : plantYield.ToString())}"
                                 );
                             }
-                            else
-                            {
-                                atmosphereMessages.Add($"  Depressurized: {vent.OxygenLevel:P0}");
-                            }
-                            stateManager.UpdateState("OnPressurized", false);
-                            break;
+                        }
                     }
-                }
 
-                // Check irrigation systems
-                if (irrigationSystems.Count > 0)
-                {
-                    float iceVolume = 0f;
-                    float inventoryVolume = 0f;
-
-                    irrigationSystems.ForEach(irrigationSystem =>
+                    if (alertMessages.Count > 0)
                     {
-                        iceVolume += irrigationSystem.CurrentVolume;
-                        inventoryVolume += irrigationSystem.MaxVolume;
-                    });
-
-                    var iceLowThreshold = thisPb.IceLowThreshold;
-                    var iceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
-                    irrigationMessages.Add($"  Ice: {iceRatio:P0}");
-
-                    stateManager.UpdateState("OnIceLow", iceRatio < iceLowThreshold);
-                }
-
-                // Additional alerts
-                if (deadPlants > 0)
-                {
-                    alertMessages.Add($"  Dead Plants: {deadPlants}");
-                }
-                stateManager.UpdateState("OnCropDead", deadPlants > 0);
-
-                if (seedsNeeded > 0)
-                {
-                    alertMessages.Add($"  Available Plots: {seedsNeeded}");
-                }
-                stateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
-
-                if (farmPlotsReadyToHarvest > 0)
-                {
-                    alertMessages.Add($"  Harvestable Plots: {farmPlotsReadyToHarvest}");
-                }
-                stateManager.UpdateState("OnCropReady", farmPlotsReadyToHarvest > 0);
-
-                // Yield summary
-                if (plotSummary.Count > 0)
-                {
-                    foreach (KeyValuePair<string, int> entry in plotSummary)
-                    {
-                        int plantYield = yieldSummary.ContainsKey(entry.Key)
-                            ? yieldSummary[entry.Key]
-                            : 0;
-                        yieldMessages.Add(
-                            $"  {entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {(plantYield == 0 ? "Growing" : plantYield.ToString())}"
+                        WriteToMainOutput(groupName, "Alerts", "ShowAlerts");
+                        alertMessages.ForEach(message =>
+                            WriteToMainOutput(groupName, message, "ShowAlerts")
                         );
+                        WriteToMainOutput(groupName, "", "ShowAlerts");
                     }
-                }
-            }
 
-            if (alertMessages.Count > 0)
-            {
-                WriteToMainOutput("Alerts", "ShowAlerts");
-                alertMessages.ForEach(message => WriteToMainOutput(message, "ShowAlerts"));
-                WriteToMainOutput("", "ShowAlerts");
-            }
+                    if (atmosphereMessages.Count > 0)
+                    {
+                        WriteToMainOutput(groupName, "Atmosphere", "ShowAtmosphere");
+                        atmosphereMessages.ForEach(message =>
+                            WriteToMainOutput(groupName, message, "ShowAtmosphere")
+                        );
+                        WriteToMainOutput(groupName, "", "ShowAtmosphere");
+                    }
 
-            if (atmosphereMessages.Count > 0)
-            {
-                WriteToMainOutput("Atmosphere", "ShowAtmosphere");
-                atmosphereMessages.ForEach(message => WriteToMainOutput(message, "ShowAtmosphere"));
-                WriteToMainOutput("", "ShowAtmosphere");
-            }
+                    if (irrigationMessages.Count > 0)
+                    {
+                        WriteToMainOutput(groupName, "Irrigation", "ShowIrrigation");
+                        irrigationMessages.ForEach(message =>
+                            WriteToMainOutput(groupName, message, "ShowIrrigation")
+                        );
+                        WriteToMainOutput(groupName, "", "ShowIrrigation");
+                    }
 
-            if (irrigationMessages.Count > 0)
-            {
-                WriteToMainOutput("Irrigation", "ShowIrrigation");
-                irrigationMessages.ForEach(message => WriteToMainOutput(message, "ShowIrrigation"));
-                WriteToMainOutput("", "ShowIrrigation");
-            }
-
-            if (yieldMessages.Count > 0)
-            {
-                WriteToMainOutput("Current Yield", "ShowYield");
-                yieldMessages.ForEach(message => WriteToMainOutput(message, "ShowYield"));
-                WriteToMainOutput("", "ShowYield");
-            }
+                    if (yieldMessages.Count > 0)
+                    {
+                        WriteToMainOutput(groupName, "Current Yield", "ShowYield");
+                        yieldMessages.ForEach(message =>
+                            WriteToMainOutput(groupName, message, "ShowYield")
+                        );
+                        WriteToMainOutput(groupName, "", "ShowYield");
+                    }
+                });
         }
 
         void PrintOutput()
         {
             thisPb.FlushTextToScreen();
 
-            if (lcdPanels.Count > 0)
-            {
-                lcdPanels.ForEach(panel =>
+            farmGroups
+                .GetAllGroups()
+                .ForEach(farmGroup =>
                 {
-                    panel.FlushTextToScreen();
+                    farmGroup.LcdPanels.ForEach(panel =>
+                    {
+                        panel.FlushTextToScreen();
+                    });
                 });
-            }
         }
 
         void PrintHeader()
@@ -324,11 +339,15 @@ namespace IngameScript
 
             WriteToDiagnosticOutput(header);
             WriteToDiagnosticOutput($"Version: {Version} ({PublishedDate})");
-            WriteToDiagnosticOutput($"Group: {groupName}");
             WriteToDiagnosticOutput("");
 
-            WriteToMainOutput(header);
-            WriteToMainOutput("");
+            farmGroups
+                .GetAllGroups()
+                .ForEach(farmGroup =>
+                {
+                    WriteToMainOutput(farmGroup.GroupName, header);
+                    WriteToMainOutput(farmGroup.GroupName, "");
+                });
 
             if (runNumber >= 3)
             {
@@ -340,15 +359,14 @@ namespace IngameScript
             }
         }
 
-        void WriteToMainOutput(string text, string category = null)
+        void WriteToMainOutput(string groupName, string text, string category = null)
         {
-            if (lcdPanels.Count > 0)
-            {
-                lcdPanels.ForEach(panel =>
+            farmGroups
+                .GetGroup(groupName)
+                .LcdPanels.ForEach(panel =>
                 {
                     panel.AppendText(text, category);
                 });
-            }
         }
 
         void WriteToDiagnosticOutput(string text)

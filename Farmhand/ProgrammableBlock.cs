@@ -19,14 +19,6 @@ namespace IngameScript
         >()
         {
             {
-                "GroupName",
-                new CustomDataConfig(
-                    "Group Name",
-                    "",
-                    "Make sure all blocks you want to track are in the same group"
-                )
-            },
-            {
                 "PlanterEmptyColor",
                 new CustomDataConfig(
                     "Plot Empty Color",
@@ -92,20 +84,6 @@ namespace IngameScript
             _lcdScreen = _programmableBlock.GetSurface(0);
             _lcdScreen.ContentType = ContentType.TEXT_AND_IMAGE;
             UpdateCustomData();
-        }
-
-        /// <summary>
-        /// Gets or sets the block group name for farm management
-        /// </summary>
-        public string GroupName
-        {
-            get
-            {
-                ParseCustomData();
-                return _customData
-                    .Get(_customDataHeader, _customDataConfigs["GroupName"].Label)
-                    .ToString("");
-            }
         }
 
         /// <summary>

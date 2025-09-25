@@ -16,6 +16,14 @@ namespace IngameScript
         >()
         {
             {
+                "GroupName",
+                new CustomDataConfig(
+                    "Group Name",
+                    "",
+                    "Make sure all blocks you want to track are in the same group"
+                )
+            },
+            {
                 "ShowAlerts",
                 new CustomDataConfig("Show Alerts", "true", "Shows information requiring attention")
             },
@@ -45,6 +53,18 @@ namespace IngameScript
             _lcdPanel = lcdPanel;
             _lcdPanel.ContentType = ContentType.TEXT_AND_IMAGE;
             UpdateCustomData();
+        }
+
+        /// <summary>
+        /// Gets the group name from custom data
+        /// </summary>
+        /// <returns></returns>
+        public string getGroupName()
+        {
+            ParseCustomData();
+            return _customData
+                .Get(_customDataHeader, _customDataConfigs["GroupName"].Label)
+                .ToString("");
         }
 
         /// <summary>
