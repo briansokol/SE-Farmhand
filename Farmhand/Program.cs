@@ -70,18 +70,25 @@ namespace IngameScript
             );
 
             var groupNames = lcdPanels
-                .ConvertAll(panel => panel.getGroupName())
+                .ConvertAll(panel => panel.GroupName())
                 .FindAll(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct()
                 .ToList();
 
+            // Get group name from this programmable block if set
+            var pbGroupName = thisPb.GroupName();
+            if (!string.IsNullOrWhiteSpace(pbGroupName) && !groupNames.Contains(pbGroupName))
+            {
+                groupNames.Add(pbGroupName);
+            }
+
+            // Remove those farm groups that are no longer referenced by any LCD panel or this programmable block
             farmGroups.RemoveGroupsNotInList(groupNames);
 
+            // For each group name, find and register the blocks
             groupNames.ForEach(groupName =>
             {
-                var lcdPanelsInGroup = lcdPanels.FindAll(panel =>
-                    panel.getGroupName() == groupName
-                );
+                var lcdPanelsInGroup = lcdPanels.FindAll(panel => panel.GroupName() == groupName);
                 farmGroups.FindBlocks(groupName, lcdPanelsInGroup);
             });
         }

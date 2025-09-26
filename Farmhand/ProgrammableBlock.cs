@@ -19,6 +19,14 @@ namespace IngameScript
         >()
         {
             {
+                "GroupName",
+                new CustomDataConfig(
+                    "Group Name",
+                    "",
+                    "Set the group name here if you only want farm plot light management (no LCD)"
+                )
+            },
+            {
                 "PlanterEmptyColor",
                 new CustomDataConfig(
                     "Plot Empty Color",
@@ -84,6 +92,14 @@ namespace IngameScript
             _lcdScreen = _programmableBlock.GetSurface(0);
             _lcdScreen.ContentType = ContentType.TEXT_AND_IMAGE;
             UpdateCustomData();
+        }
+
+        public string GroupName()
+        {
+            ParseCustomData();
+            return _customData
+                .Get(_customDataHeader, _customDataConfigs["GroupName"].Label)
+                .ToString("");
         }
 
         /// <summary>

@@ -59,7 +59,7 @@ namespace IngameScript
         /// Gets the group name from custom data
         /// </summary>
         /// <returns></returns>
-        public string getGroupName()
+        public string GroupName()
         {
             ParseCustomData();
             return _customData
