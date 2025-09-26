@@ -72,7 +72,7 @@ namespace IngameScript
                         _customData.SetComment(
                             _customDataHeader,
                             entry.Value.Label,
-                            entry.Value.Comment
+                            $"--{entry.Value.Comment}"
                         );
                     }
                 }

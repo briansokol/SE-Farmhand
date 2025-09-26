@@ -257,6 +257,21 @@ namespace IngameScript
                             farmPlotsReadyToHarvest > 0
                         );
 
+                        // Check if all planted crops are ready to harvest
+                        var totalPlantedPlots = 0;
+                        farmGroup.FarmPlots.ForEach(farmPlot =>
+                        {
+                            if (farmPlot.IsPlantPlanted && farmPlot.IsPlantAlive)
+                            {
+                                totalPlantedPlots++;
+                            }
+                        });
+
+                        farmGroup.StateManager.UpdateState(
+                            "OnAllCropsReady",
+                            totalPlantedPlots > 0 && farmPlotsReadyToHarvest == totalPlantedPlots
+                        );
+
                         // Yield summary
                         if (plotSummary.Count > 0)
                         {

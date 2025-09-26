@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using SpaceEngineers.Game.ModAPI.Ingame;
-using VRage.Game.GUI.TextPanel;
 
 namespace IngameScript
 {
@@ -77,7 +76,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "On Crop Ready",
                     "false",
-                    "Triggers when a farm plot crop is ready for harvest"
+                    "Triggers when any farm plot crop is ready for harvest"
                 )
             },
             {
@@ -86,6 +85,22 @@ namespace IngameScript
                     "On Crop Not Ready",
                     "false",
                     "Triggers when no farm plots are ready for harvest"
+                )
+            },
+            {
+                "OnAllCropsReadyTrue",
+                new CustomDataConfig(
+                    "On All Crops Ready",
+                    "false",
+                    "Triggers when all planted farm plots with crops are ready for harvest"
+                )
+            },
+            {
+                "OnAllCropsReadyFalse",
+                new CustomDataConfig(
+                    "On All Crops Not Ready",
+                    "false",
+                    "Triggers when you plant a crop while all other planted plots are ready for harvest"
                 )
             },
             {
