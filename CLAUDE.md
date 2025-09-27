@@ -58,11 +58,13 @@ The project follows a component-based architecture with a base `Block` class tha
   - `FarmPlot.cs`: Manages agricultural plots with plant monitoring and lighting
   - `IrrigationSystem.cs`: Handles water/ice management systems
   - `LcdPanel.cs`: Controls text display panels
+  - `Cockpit.cs`: Controls cockpit displays with multiple screens
   - `AirVent.cs`: Monitors atmospheric conditions
   - `ProgrammableBlock.cs`: Self-referential block for configuration
   - `Timer.cs`: Event-driven timer automation with state-based triggering
 - **Support Classes**: Core system management components
   - `StateManager.cs`: State change detection and timer event coordination
+  - `FarmGroups.cs`: Group management for organizing blocks by farm groups
 
 ### Key Design Patterns
 
@@ -90,7 +92,8 @@ Timer blocks support multiple event triggers configured via custom data:
 - **OnWaterLowTrue/False**: Responds to farm plot water levels
 - **OnIceLowTrue/False**: Responds to irrigation system ice levels
 - **OnPressurizedTrue/False**: Responds to air vent pressure changes
-- **OnCropReadyTrue/False**: Responds to harvest-ready crops
+- **OnCropReadyTrue/False**: Responds to harvest-ready crops (any crop ready)
+- **OnAllCropsReadyTrue/False**: Responds when all planted crops are ready for harvest
 - **OnCropDeadTrue/False**: Responds to dead crops
 - **OnCropAvailableTrue/False**: Responds to crops available for harvest
 - **TriggerNow**: Controls immediate vs. countdown triggering
@@ -139,6 +142,24 @@ The script operates on blocks within a named group (configured via Programmable 
 - Groups multiple farm-related blocks for coordinated management
 - Automatically discovers and categorizes blocks within the group
 - Supports hot-swapping of blocks without script restart
+
+### Display System
+
+The script supports multiple display types for farm information:
+
+#### LCD Panels
+- Single-screen LCD panels with `[FarmLCD]` in their custom name
+- Display all farm information categories on one screen
+
+#### Multi-Screen Text Surface Providers
+- Blocks with multiple screens (cockpits, programmable blocks, etc.) with `[FarmLCD]` in their custom name
+- Configure which screen displays each category via custom data:
+  - **Show Alerts**: Screen index for alert messages (default: 0)
+  - **Show Atmosphere**: Screen index for atmospheric data (default: 0)
+  - **Show Irrigation**: Screen index for irrigation system status (default: 0)
+  - **Show Yield**: Screen index for crop yield information (default: 0)
+- Set screen index (0, 1, 2, etc.) or "false" to hide category
+- Automatically detects available screens and prevents duplicate assignments
 
 ### Update Frequency
 

@@ -21,6 +21,9 @@ namespace IngameScript
         }
     }
 
+    /// <summary>
+    /// Abstract base class for all Space Engineers block wrappers with custom data management
+    /// </summary>
     internal abstract class Block
     {
         protected readonly MyIni _customData = new MyIni();
@@ -28,7 +31,7 @@ namespace IngameScript
         protected readonly MyGridProgram _program;
 
         // Abstract properties that must be implemented by derived classes
-        protected abstract IMyFunctionalBlock BlockInstance { get; }
+        public abstract IMyTerminalBlock BlockInstance { get; }
         protected abstract Dictionary<string, CustomDataConfig> CustomDataConfigs { get; }
 
         protected Block(MyGridProgram program)
@@ -41,18 +44,31 @@ namespace IngameScript
         /// </summary>
         public bool IsFunctional()
         {
-            return BlockInstance != null && !BlockInstance.Closed && BlockInstance.Enabled;
+            return IsBlockValid(BlockInstance)
+                && (
+                    !(BlockInstance is IMyFunctionalBlock)
+                    || (BlockInstance as IMyFunctionalBlock).Enabled
+                );
         }
+
+        /// <summary>
+        /// Gets the custom name of the farm plot block
+        /// </summary>
+        public string CustomName =>
+            IsBlockValid(BlockInstance) ? BlockInstance.CustomName : "NOT VALID";
 
         /// <summary>
         /// Generic validation method for blocks that only need basic validation
         /// </summary>
         protected static bool IsBlockValid<T>(T block)
-            where T : class, IMyFunctionalBlock
+            where T : class, IMyTerminalBlock
         {
-            return block != null && !block.Closed && block.Enabled;
+            return block != null && !block.Closed;
         }
 
+        /// <summary>
+        /// Updates the block's custom data with current configuration values
+        /// </summary>
         protected void UpdateCustomData()
         {
             if (CustomDataConfigs != null && CustomDataConfigs.Count > 0 && IsFunctional())
@@ -80,6 +96,9 @@ namespace IngameScript
             }
         }
 
+        /// <summary>
+        /// Parses custom data from the block's CustomData property into the internal INI structure
+        /// </summary>
         public void ParseCustomData()
         {
             if (CustomDataConfigs != null && CustomDataConfigs.Count > 0 && IsFunctional())

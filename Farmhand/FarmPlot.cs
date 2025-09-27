@@ -6,6 +6,9 @@ using VRageMath;
 
 namespace IngameScript
 {
+    /// <summary>
+    /// Manages agricultural plots with plant monitoring, lighting control, and harvest tracking
+    /// </summary>
     internal class FarmPlot : Block
     {
         private readonly IMyFunctionalBlock _farmPlot;
@@ -13,7 +16,7 @@ namespace IngameScript
         private readonly IMyLightingComponent _lightingComponent;
         private readonly IMyResourceStorageComponent _storageComponent;
 
-        protected override IMyFunctionalBlock BlockInstance => _farmPlot;
+        public override IMyTerminalBlock BlockInstance => _farmPlot;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs => null;
 
         /// <summary>
@@ -21,7 +24,6 @@ namespace IngameScript
         /// </summary>
         /// <param name="farmPlot">The Space Engineers farm plot block to wrap</param>
         /// <param name="program">The parent grid program instance</param>
-        /// <param name="diagnosticOutput">StringBuilder for diagnostic output</param>
         public FarmPlot(IMyFunctionalBlock farmPlot, MyGridProgram program)
             : base(program)
         {
@@ -45,11 +47,6 @@ namespace IngameScript
                 }
             }
         }
-
-        /// <summary>
-        /// Gets the custom name of the farm plot block
-        /// </summary>
-        public string CustomName => IsFunctional() ? _farmPlot.CustomName : string.Empty;
 
         /// <summary>
         /// Gets whether a plant is currently planted in this farm plot
@@ -249,9 +246,13 @@ namespace IngameScript
         /// </summary>
         /// <param name="block">The block to validate</param>
         /// <returns>True if the block can be used as a farm plot</returns>
-        public static bool BlockIsValid(IMyFunctionalBlock block)
+        public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            if (!IsBlockValid(block))
+            if (
+                !(block is IMyFunctionalBlock)
+                || !IsBlockValid(block)
+                || !(block as IMyFunctionalBlock).Enabled
+            )
             {
                 return false;
             }

@@ -5,17 +5,18 @@ using SpaceEngineers.Game.ModAPI.Ingame;
 
 namespace IngameScript
 {
+    /// <summary>
+    /// Main Space Engineers Programmable Block Script for automated farm management
+    /// </summary>
     public partial class Program : MyGridProgram
     {
-        readonly string Version = "v0.5";
-        readonly string PublishedDate = "2025-09-22";
-
         readonly FarmGroups farmGroups;
         readonly ProgrammableBlock thisPb;
 
-        // readonly List<LcdPanel> LcdPanels = new List<LcdPanel>();
-        // List<string> GroupNames = new List<string>();
+        readonly string lcdTag = "FarmLCD";
         int runNumber = 0;
+        readonly string Version = "v0.6";
+        readonly string PublishedDate = "2025-09-26";
 
         public Program()
         {
@@ -24,8 +25,14 @@ namespace IngameScript
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
         }
 
+        /// <summary>
+        /// Required by Space Engineers API - currently not used
+        /// </summary>
         public void Save() { }
 
+        /// <summary>
+        /// Main execution loop called every 100 ticks by Space Engineers
+        /// </summary>
         public void Main()
         {
             if (runNumber == 0)
@@ -40,40 +47,74 @@ namespace IngameScript
                 .ForEach(farmGroup =>
                 {
                     WriteToDiagnosticOutput($"Group: {farmGroup.GroupName}");
-                    WriteToDiagnosticOutput($"  Farm Plots: {farmGroup.FarmPlots.Count}");
-                    WriteToDiagnosticOutput(
-                        $"  Irrigation Systems: {farmGroup.IrrigationSystems.Count}"
-                    );
-                    WriteToDiagnosticOutput($"  LCD Panels: {farmGroup.LcdPanels.Count}");
-                    WriteToDiagnosticOutput($"  Air Vents: {farmGroup.AirVents.Count}");
-                    WriteToDiagnosticOutput(
-                        $"  Timers: {farmGroup.StateManager.RegisteredTimerCount}"
-                    );
+                    if (farmGroup.FarmPlots.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"  Farm Plots: {farmGroup.FarmPlots.Count}");
+                    }
+                    if (farmGroup.IrrigationSystems.Count > 0)
+                    {
+                        WriteToDiagnosticOutput(
+                            $"  Irrigation Systems: {farmGroup.IrrigationSystems.Count}"
+                        );
+                    }
+                    if (farmGroup.LcdPanels.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"  LCD Panels: {farmGroup.LcdPanels.Count}");
+                    }
+                    if (farmGroup.Cockpits.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"  Control Seats: {farmGroup.Cockpits.Count}");
+                    }
+                    if (farmGroup.AirVents.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"  Air Vents: {farmGroup.AirVents.Count}");
+                    }
+                    if (farmGroup.StateManager.RegisteredTimerCount > 0)
+                    {
+                        WriteToDiagnosticOutput(
+                            $"  Timers: {farmGroup.StateManager.RegisteredTimerCount}"
+                        );
+                    }
                 });
             GetBlockState();
             PrintOutput();
         }
 
+        /// <summary>
+        /// Discovers and categorizes blocks with [FarmLCD] tag for farm management
+        /// </summary>
         void FindBlocks()
         {
             var lcdPanels = new List<LcdPanel>();
+            var cockpits = new List<Cockpit>();
 
-            // Find the LCD panels with [FarmLCD] in their custom name
-            List<IMyTerminalBlock> validLcdPanels = new List<IMyTerminalBlock>();
-            GridTerminalSystem.SearchBlocksOfName(
-                "[FarmLCD]",
-                validLcdPanels,
-                panel => panel is IMyTextPanel && LcdPanel.BlockIsValid(panel as IMyTextPanel)
-            );
-            validLcdPanels.ForEach(block =>
-                lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this))
-            );
+            // Find the blocks with [FarmLCD] in their custom name
+            List<IMyTerminalBlock> lcdTaggedBlocks = new List<IMyTerminalBlock>();
+            GridTerminalSystem.SearchBlocksOfName($"[{lcdTag}]", lcdTaggedBlocks);
+            lcdTaggedBlocks.ForEach(block =>
+            {
+                if (Cockpit.BlockIsValid(block))
+                {
+                    cockpits.Add(new Cockpit(block as IMyCockpit, this));
+                }
+                else if (LcdPanel.BlockIsValid(block as IMyFunctionalBlock))
+                {
+                    lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this));
+                }
+            });
 
             var groupNames = lcdPanels
                 .ConvertAll(panel => panel.GroupName())
                 .FindAll(name => !string.IsNullOrWhiteSpace(name))
                 .Distinct()
                 .ToList();
+
+            var cockpitGroupNames = cockpits
+                .ConvertAll(cockpit => cockpit.GroupName())
+                .FindAll(name => !string.IsNullOrWhiteSpace(name));
+
+            groupNames.AddRange(cockpitGroupNames);
+            groupNames = groupNames.Distinct().ToList();
 
             // Get group name from this programmable block if set
             var pbGroupName = thisPb.GroupName();
@@ -89,10 +130,14 @@ namespace IngameScript
             groupNames.ForEach(groupName =>
             {
                 var lcdPanelsInGroup = lcdPanels.FindAll(panel => panel.GroupName() == groupName);
-                farmGroups.FindBlocks(groupName, lcdPanelsInGroup);
+                var cockpitsInGroup = cockpits.FindAll(cockpit => cockpit.GroupName() == groupName);
+                farmGroups.FindBlocks(groupName, lcdPanelsInGroup, cockpitsInGroup);
             });
         }
 
+        /// <summary>
+        /// Updates state of all farm blocks and prepares output messages
+        /// </summary>
         void GetBlockState()
         {
             farmGroups
@@ -325,6 +370,9 @@ namespace IngameScript
                 });
         }
 
+        /// <summary>
+        /// Flushes accumulated text output to all LCD panels and cockpit screens
+        /// </summary>
         void PrintOutput()
         {
             thisPb.FlushTextToScreen();
@@ -337,9 +385,16 @@ namespace IngameScript
                     {
                         panel.FlushTextToScreen();
                     });
+                    farmGroup.Cockpits.ForEach(cockpit =>
+                    {
+                        cockpit.FlushTextToScreens();
+                    });
                 });
         }
 
+        /// <summary>
+        /// Prints the application header and version information
+        /// </summary>
         void PrintHeader()
         {
             string header = "";
@@ -360,15 +415,15 @@ namespace IngameScript
             }
 
             WriteToDiagnosticOutput(header);
-            WriteToDiagnosticOutput($"Version: {Version} ({PublishedDate})");
+            WriteToDiagnosticOutput($"Version: {Version} | ({PublishedDate})");
             WriteToDiagnosticOutput("");
 
             farmGroups
                 .GetAllGroups()
                 .ForEach(farmGroup =>
                 {
-                    WriteToMainOutput(farmGroup.GroupName, header);
-                    WriteToMainOutput(farmGroup.GroupName, "");
+                    WriteToMainOutput(farmGroup.GroupName, header, "Header");
+                    WriteToMainOutput(farmGroup.GroupName, "", "Header");
                 });
 
             if (runNumber >= 3)
@@ -381,16 +436,31 @@ namespace IngameScript
             }
         }
 
+        /// <summary>
+        /// Writes text to all LCD panels and cockpits in the specified farm group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group to write to</param>
+        /// <param name="text">Text content to display</param>
+        /// <param name="category">Optional category for filtering display</param>
         void WriteToMainOutput(string groupName, string text, string category = null)
         {
-            farmGroups
-                .GetGroup(groupName)
-                .LcdPanels.ForEach(panel =>
-                {
-                    panel.AppendText(text, category);
-                });
+            var group = farmGroups.GetGroup(groupName);
+
+            group.LcdPanels.ForEach(panel =>
+            {
+                panel.AppendText(text, category);
+            });
+
+            group.Cockpits.ForEach(cockpit =>
+            {
+                cockpit.AppendText(text, category);
+            });
         }
 
+        /// <summary>
+        /// Writes diagnostic text to the programmable block's LCD screen
+        /// </summary>
+        /// <param name="text">Diagnostic text to display</param>
         void WriteToDiagnosticOutput(string text)
         {
             thisPb.AppendText(text);

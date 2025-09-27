@@ -7,6 +7,9 @@ using VRageMath;
 
 namespace IngameScript
 {
+    /// <summary>
+    /// Self-referential block for configuration display on the programmable block's LCD screen
+    /// </summary>
     internal class ProgrammableBlock : Block
     {
         private readonly IMyProgrammableBlock _programmableBlock;
@@ -76,7 +79,7 @@ namespace IngameScript
             },
         };
 
-        protected override IMyFunctionalBlock BlockInstance => _programmableBlock;
+        public override IMyTerminalBlock BlockInstance => _programmableBlock;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs =>
             _customDataConfigs;
 
@@ -94,6 +97,10 @@ namespace IngameScript
             UpdateCustomData();
         }
 
+        /// <summary>
+        /// Gets the group name from custom data
+        /// </summary>
+        /// <returns>The configured group name</returns>
         public string GroupName()
         {
             ParseCustomData();
@@ -242,6 +249,10 @@ namespace IngameScript
         /// Writes text to the terminal and appends it to the internal buffer
         /// </summary>
         /// <param name="text">Text to display</param>
+        /// <summary>
+        /// Appends text to the internal buffer for display on the programmable block's LCD
+        /// </summary>
+        /// <param name="text">Text to append</param>
         public void AppendText(string text)
         {
             if (IsFunctional() && _lcdScreen != null)
@@ -253,6 +264,9 @@ namespace IngameScript
 
         /// <summary>
         /// Flushes the accumulated text to the LCD panel and clears the buffer
+        /// </summary>
+        /// <summary>
+        /// Flushes the accumulated text to the programmable block's LCD and clears the buffer
         /// </summary>
         public void FlushTextToScreen()
         {

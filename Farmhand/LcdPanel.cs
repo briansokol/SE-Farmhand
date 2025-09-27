@@ -5,6 +5,9 @@ using VRage.Game.GUI.TextPanel;
 
 namespace IngameScript
 {
+    /// <summary>
+    /// Controls single-screen LCD text display panels for farm information output
+    /// </summary>
     internal class LcdPanel : Block
     {
         private readonly IMyTextPanel _lcdPanel;
@@ -24,6 +27,10 @@ namespace IngameScript
                 )
             },
             {
+                "Header",
+                new CustomDataConfig("Header", "true", "Shows the animated header on the screen")
+            },
+            {
                 "ShowAlerts",
                 new CustomDataConfig("Show Alerts", "true", "Shows information requiring attention")
             },
@@ -38,7 +45,7 @@ namespace IngameScript
             { "ShowYield", new CustomDataConfig("Show Yield", "true", "Shows current crop yield") },
         };
 
-        protected override IMyFunctionalBlock BlockInstance => _lcdPanel;
+        public override IMyTerminalBlock BlockInstance => _lcdPanel;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs =>
             _customDataConfigs;
 
@@ -51,7 +58,6 @@ namespace IngameScript
             : base(program)
         {
             _lcdPanel = lcdPanel;
-            _lcdPanel.ContentType = ContentType.TEXT_AND_IMAGE;
             UpdateCustomData();
         }
 
@@ -90,6 +96,7 @@ namespace IngameScript
         {
             if (IsFunctional() && _lcdPanel != null)
             {
+                _lcdPanel.ContentType = ContentType.TEXT_AND_IMAGE;
                 _lcdPanel.WriteText(_lcdOutput.ToString(), false);
                 _lcdOutput.Clear();
             }
@@ -120,9 +127,9 @@ namespace IngameScript
         /// </summary>
         /// <param name="block">The text panel block to validate</param>
         /// <returns>True if the block can be used as an LCD panel</returns>
-        public static bool BlockIsValid(IMyTextPanel block)
+        public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            return IsBlockValid(block);
+            return block is IMyTextPanel && IsBlockValid(block) && (block as IMyTextPanel).Enabled;
         }
     }
 }

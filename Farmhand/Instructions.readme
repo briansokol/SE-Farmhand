@@ -1,26 +1,25 @@
-﻿Farmhand v0.5
-By Duke Skyloafer
-2025-09-22
-------------
+Farmhand v0.6
+Automated Farm Management for Space Engineers
+By Duke Skyloafer | 2025-09-26
 
-This script tracks various blocks related to farm plots to help with automation:
-  - Changes the lights on the farm plots to indicate the status of the crop (configurable):
-    - Dark Purple: Nothing planted
-    - White: Plant is growing
-    - Green: Plant is ready to harvest
-    - Read: Plant is dead
-    - Blinking White: Farm plot is low on water
-  - Flashes the plot light when the water is low
-  - Tracks the amount of ice in irrigation systems
-  - Tracks the air/pressurization status using an air vent
-  - Triggers timer blocks when certain events occur
+QUICK SETUP
 
-Setup:
-  - Add the blocks you want to track to a group:
-    - Farm Plots
-    - Irrigation Systems
-    - LCD Panels (Only full panels, blocks with multiple screens aren't yet supported)
-    - Air Vents (You can add more than one, but it will only use the first one it finds)
-    - Timer Blocks
-  - Set the group name in this programmable block's Custom Data
-  - Configure blocks by changing options in their Custom Data
+1. Add your blocks to groups:
+   - Farm Plots
+   - Irrigation Systems
+   - Air Vents
+   - Timer Blocks
+
+2. Add Display Screens: Put [FarmLCD] in the name of any LCD panel or multi-screen block (cockpit, control seat, etc.)
+
+3. Configure: Set the group name in your display block's custom data to match your farm group name
+
+4. Customize: Adjust settings through custom data on individual blocks
+
+ADVANCED FEATURES
+
+- Multi-Screen Support: Cockpits and programmable blocks can show different categories on separate screens
+- Event Automation: Timer blocks can respond to crop ready, water low, pressure changes, and more
+- Multiple Farm Groups: Track separate farms with different display screens
+
+Configure all settings through custom data.

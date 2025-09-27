@@ -5,6 +5,9 @@ using SpaceEngineers.Game.ModAPI.Ingame;
 
 namespace IngameScript
 {
+    /// <summary>
+    /// Event-driven timer automation with state-based triggering for farm operations
+    /// </summary>
     internal class Timer : Block
     {
         private readonly IMyTimerBlock _timerBlock;
@@ -137,7 +140,7 @@ namespace IngameScript
             },
         };
 
-        protected override IMyFunctionalBlock BlockInstance => _timerBlock;
+        public override IMyTerminalBlock BlockInstance => _timerBlock;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs =>
             _customDataConfigs;
 
@@ -197,9 +200,11 @@ namespace IngameScript
         /// </summary>
         /// <param name="block">The timer block to validate</param>
         /// <returns>True if the block can be used as a timer</returns>
-        public static bool BlockIsValid(IMyTimerBlock block)
+        public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            return IsBlockValid(block);
+            return IsBlockValid(block)
+                && block is IMyTimerBlock
+                && (block as IMyTimerBlock).Enabled;
         }
     }
 }

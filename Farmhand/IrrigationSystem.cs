@@ -7,12 +7,15 @@ using VRage.Game.ModAPI.Ingame;
 
 namespace IngameScript
 {
+    /// <summary>
+    /// Manages water/ice processing systems for farm irrigation using hydrogen/oxygen generators
+    /// </summary>
     internal class IrrigationSystem : Block
     {
         private readonly IMyGasGenerator _irrigationSystem;
         private readonly IMyInventory _inventory;
 
-        protected override IMyFunctionalBlock BlockInstance => _irrigationSystem;
+        public override IMyTerminalBlock BlockInstance => _irrigationSystem;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs => null;
 
         /// <summary>
@@ -51,9 +54,13 @@ namespace IngameScript
         /// </summary>
         /// <param name="block">The gas generator block to validate</param>
         /// <returns>True if the block can be used as an irrigation system</returns>
-        public static bool BlockIsValid(IMyGasGenerator block)
+        public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            if (!IsBlockValid(block))
+            if (
+                !(block is IMyGasGenerator)
+                || !IsBlockValid(block)
+                || !(block as IMyGasGenerator).Enabled
+            )
             {
                 return false;
             }
