@@ -127,7 +127,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "On Crop Available",
                     "false",
-                    "Triggers when a farm plot crop is available for harvest"
+                    "Triggers when a farm plot crop is available for planting"
                 )
             },
             {
@@ -135,7 +135,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "On Crop Not Available",
                     "false",
-                    "Triggers when no farm plots have crops available for harvest"
+                    "Triggers when no farm plots have crops available for planting"
                 )
             },
         };

@@ -74,6 +74,10 @@ namespace IngameScript
             if (CustomDataConfigs != null && CustomDataConfigs.Count > 0 && IsFunctional())
             {
                 ParseCustomData();
+                _customData.SetSectionComment(
+                    _customDataHeader,
+                    "; For more detailed explanation of options, see the official guide on Steam"
+                );
                 foreach (KeyValuePair<string, CustomDataConfig> entry in CustomDataConfigs)
                 {
                     _customData.Set(
@@ -88,7 +92,7 @@ namespace IngameScript
                         _customData.SetComment(
                             _customDataHeader,
                             entry.Value.Label,
-                            $"--{entry.Value.Comment}"
+                            $"; {entry.Value.Comment}"
                         );
                     }
                 }

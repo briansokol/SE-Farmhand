@@ -1,6 +1,8 @@
-Farmhand v0.6
-Automated Farm Management for Space Engineers
-By Duke Skyloafer | 2025-09-26
+Farmhand v0.6.1
+Automated Farm Management
+By Duke Skyloafer | 2025-09-27
+
+Full guide: https://steamcommunity.com/sharedfiles/filedetails/?id=3575736083
 
 QUICK SETUP
 
@@ -15,11 +17,5 @@ QUICK SETUP
 3. Configure: Set the group name in your display block's custom data to match your farm group name
 
 4. Customize: Adjust settings through custom data on individual blocks
-
-ADVANCED FEATURES
-
-- Multi-Screen Support: Cockpits and programmable blocks can show different categories on separate screens
-- Event Automation: Timer blocks can respond to crop ready, water low, pressure changes, and more
-- Multiple Farm Groups: Track separate farms with different display screens
 
 Configure all settings through custom data.

@@ -26,7 +26,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "Group Name",
                     "",
-                    "Set the group name here if you only want farm plot light management (no LCD)"
+                    "Use only if you don't want to see status on an LCD"
                 )
             },
             {
@@ -66,7 +66,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "Ice Low Threshold",
                     "0.2",
-                    "Ice level threshold (0.0-1.0) that triggers low ice alerts and events (default: 0.2 = 20%)"
+                    "Low Ice percent threshold, between 0.0 and 1.0 (default: 0.2)"
                 )
             },
             {
@@ -74,7 +74,7 @@ namespace IngameScript
                 new CustomDataConfig(
                     "Water Low Threshold",
                     "0.2",
-                    "Water level threshold (0.0-1.0) that triggers low water alerts and blinking lights (default: 0.2 = 20%)"
+                    "Low Water percent threshold, between 0.0 and 1.0 (default: 0.2)"
                 )
             },
         };

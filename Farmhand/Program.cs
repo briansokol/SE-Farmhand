@@ -15,8 +15,8 @@ namespace IngameScript
 
         readonly string lcdTag = "FarmLCD";
         int runNumber = 0;
-        readonly string Version = "v0.6";
-        readonly string PublishedDate = "2025-09-26";
+        readonly string Version = "v0.6.1";
+        readonly string PublishedDate = "2025-09-27";
 
         public Program()
         {
@@ -415,7 +415,7 @@ namespace IngameScript
             }
 
             WriteToDiagnosticOutput(header);
-            WriteToDiagnosticOutput($"Version: {Version} | ({PublishedDate})");
+            WriteToDiagnosticOutput($"{Version} | ({PublishedDate})");
             WriteToDiagnosticOutput("");
 
             farmGroups
