@@ -74,10 +74,6 @@ namespace IngameScript
             if (CustomDataConfigs != null && CustomDataConfigs.Count > 0 && IsFunctional())
             {
                 ParseCustomData();
-                _customData.SetSectionComment(
-                    _customDataHeader,
-                    "; For more detailed explanation of options, see the official guide on Steam"
-                );
                 foreach (KeyValuePair<string, CustomDataConfig> entry in CustomDataConfigs)
                 {
                     _customData.Set(
@@ -96,6 +92,10 @@ namespace IngameScript
                         );
                     }
                 }
+                _customData.SetSectionComment(
+                    _customDataHeader,
+                    "; For more detailed explanations of options, see the official guide on Steam"
+                );
                 BlockInstance.CustomData = _customData.ToString();
             }
         }
