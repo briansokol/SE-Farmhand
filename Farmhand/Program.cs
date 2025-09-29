@@ -78,6 +78,10 @@ namespace IngameScript
                 });
             GetBlockState();
             PrintOutput();
+            Echo("");
+            Echo(
+                $"Usage: {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount} ({(float)Runtime.CurrentInstructionCount / (float)Runtime.MaxInstructionCount:P2})"
+            );
         }
 
         /// <summary>
