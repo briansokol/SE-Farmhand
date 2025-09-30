@@ -32,19 +32,6 @@ namespace IngameScript
             AirVents = new List<AirVent>();
             StateManager = new StateManager();
         }
-
-        /// <summary>
-        /// Clears all blocks from this farm group
-        /// </summary>
-        public void Clear()
-        {
-            FarmPlots.Clear();
-            IrrigationSystems.Clear();
-            LcdPanels.Clear();
-            Cockpits.Clear();
-            AirVents.Clear();
-            StateManager.ClearTimers();
-        }
     }
 
     /// <summary>
@@ -99,7 +86,9 @@ namespace IngameScript
         public void ResetBlocks(string groupName, List<LcdPanel> lcdPanels, List<Cockpit> cockpits)
         {
             var group = GetGroup(groupName);
-            group.Clear();
+
+            group.LcdPanels.Clear();
+            group.Cockpits.Clear();
 
             group.LcdPanels.AddRange(lcdPanels);
             group.Cockpits.AddRange(cockpits);
@@ -114,6 +103,8 @@ namespace IngameScript
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
 
+            group.FarmPlots.Clear();
+
             List<IMyFunctionalBlock> validFarmPlots = new List<IMyFunctionalBlock>();
             blockGroup?.GetBlocksOfType(validFarmPlots, block => FarmPlot.BlockIsValid(block));
             validFarmPlots.ForEach(block => group.FarmPlots.Add(new FarmPlot(block, program)));
@@ -127,6 +118,8 @@ namespace IngameScript
         {
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
+            group.IrrigationSystems.Clear();
 
             List<IMyGasGenerator> validIrrigationSystems = new List<IMyGasGenerator>();
             blockGroup?.GetBlocksOfType(
@@ -147,6 +140,8 @@ namespace IngameScript
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
 
+            group.AirVents.Clear();
+
             List<IMyAirVent> validAirVents = new List<IMyAirVent>();
             blockGroup?.GetBlocksOfType(validAirVents, block => AirVent.BlockIsValid(block));
             validAirVents.ForEach(block => group.AirVents.Add(new AirVent(block, program)));
@@ -160,6 +155,8 @@ namespace IngameScript
         {
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
+            group.StateManager.ClearTimers();
 
             List<IMyTimerBlock> validTimers = new List<IMyTimerBlock>();
             blockGroup?.GetBlocksOfType(validTimers, block => Timer.BlockIsValid(block));

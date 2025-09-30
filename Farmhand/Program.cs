@@ -16,13 +16,13 @@ namespace IngameScript
 
         readonly string lcdTag = "FarmLCD";
         int runNumber = 0;
-        bool isInitialized = false;
         readonly string Version = "v0.7.0";
         readonly string PublishedDate = "2025-09-29";
 
         // Coroutine management
         readonly List<IEnumerator<bool>> activeCoroutines = new List<IEnumerator<bool>>();
-        int coroutineIndex = 0; // For round-robin execution
+        double currentCycleTime = 0;
+        double lastCycleTime = 0;
 
         public Program()
         {
@@ -44,108 +44,183 @@ namespace IngameScript
             // Start new coroutines immediately when no operations are running
             if (activeCoroutines.Count == 0)
             {
-                // Print header once per cycle
-                PrintHeader();
-
-                // Print diagnostic info once per cycle
-                farmGroups
-                    .GetAllGroups()
-                    .ForEach(farmGroup =>
-                    {
-                        WriteToDiagnosticOutput($"Group: {farmGroup.GroupName}");
-                        if (farmGroup.FarmPlots.Count > 0)
-                        {
-                            WriteToDiagnosticOutput($"  Farm Plots: {farmGroup.FarmPlots.Count}");
-                        }
-                        if (farmGroup.IrrigationSystems.Count > 0)
-                        {
-                            WriteToDiagnosticOutput(
-                                $"  Irrigation Systems: {farmGroup.IrrigationSystems.Count}"
-                            );
-                        }
-                        if (farmGroup.LcdPanels.Count > 0)
-                        {
-                            WriteToDiagnosticOutput($"  LCD Panels: {farmGroup.LcdPanels.Count}");
-                        }
-                        if (farmGroup.Cockpits.Count > 0)
-                        {
-                            WriteToDiagnosticOutput($"  Control Seats: {farmGroup.Cockpits.Count}");
-                        }
-                        if (farmGroup.AirVents.Count > 0)
-                        {
-                            WriteToDiagnosticOutput($"  Air Vents: {farmGroup.AirVents.Count}");
-                        }
-                        if (farmGroup.StateManager.RegisteredTimerCount > 0)
-                        {
-                            WriteToDiagnosticOutput(
-                                $"  Timers: {farmGroup.StateManager.RegisteredTimerCount}"
-                            );
-                        }
-                    });
-
-                // Add Coroutines
-                activeCoroutines.Add(FindBlocksCoroutine());
-                activeCoroutines.Add(GetBlockStateCoroutine());
-                activeCoroutines.Add(PrintOutputCoroutine());
+                RestartCoroutineCycle();
             }
 
             // Execute coroutines
             ExecuteCoroutines();
+
+            // Accumulate cycle time
+            currentCycleTime += Runtime.TimeSinceLastRun.TotalMilliseconds;
 
             Echo($"Instructions: {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
             Echo(
                 $"Quota: {(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2}"
             );
             Echo($"Active Coroutines: {activeCoroutines.Count}");
+            Echo($"Last Cycle Time: {lastCycleTime / 1000:F2}s");
         }
 
         /// <summary>
-        /// Executes active coroutines in round-robin fashion and manages their lifecycle
+        /// Executes active coroutines sequentially and manages their lifecycle
         /// </summary>
         void ExecuteCoroutines()
         {
             if (activeCoroutines.Count == 0)
                 return;
 
-            // Execute one coroutine per tick in round-robin fashion
-            if (coroutineIndex >= activeCoroutines.Count)
-                coroutineIndex = 0;
-
-            var coroutine = activeCoroutines[coroutineIndex];
+            // Always execute the first coroutine in the list
+            var coroutine = activeCoroutines[0];
             try
             {
                 if (!coroutine.MoveNext())
                 {
-                    // Coroutine completed, dispose and remove
+                    // Coroutine completed, dispose it
                     coroutine.Dispose();
-                    activeCoroutines.RemoveAt(coroutineIndex);
+                    activeCoroutines.RemoveAt(0);
 
-                    // If this was the first FindBlocks coroutine, mark as initialized
-                    if (!isInitialized && activeCoroutines.Count == 0)
+                    // Start the next coroutine in sequence
+                    if (activeCoroutines.Count == 0)
                     {
-                        isInitialized = true;
+                        RestartCoroutineCycle();
                     }
-
-                    // Adjust index after removal
-                    if (coroutineIndex >= activeCoroutines.Count)
-                        coroutineIndex = 0;
-                }
-                else
-                {
-                    // Move to next coroutine for next tick
-                    coroutineIndex++;
                 }
             }
             catch
             {
-                // Error in coroutine, dispose and remove
+                // Error in coroutine, dispose and skip to next
                 coroutine.Dispose();
-                activeCoroutines.RemoveAt(coroutineIndex);
+                activeCoroutines.RemoveAt(0);
 
-                // Adjust index after removal
-                if (coroutineIndex >= activeCoroutines.Count)
-                    coroutineIndex = 0;
+                // Start the next coroutine in sequence
+                if (activeCoroutines.Count == 0)
+                {
+                    RestartCoroutineCycle();
+                }
             }
+        }
+
+        /// <summary>
+        /// Restarts the coroutine cycle and prints diagnostic information
+        /// </summary>
+        void RestartCoroutineCycle()
+        {
+            // Save the completed cycle time and reset for new cycle
+            lastCycleTime = currentCycleTime;
+            currentCycleTime = 0;
+
+            // All coroutines completed, restart the cycle
+            PrintDiagnosticHeader();
+
+            activeCoroutines.Add(FindBlocksCoroutine());
+            activeCoroutines.Add(PrintHeaderCoroutine());
+            activeCoroutines.Add(GetBlockStateCoroutine());
+            activeCoroutines.Add(PrintOutputCoroutine());
+        }
+
+        /// <summary>
+        /// Prints header and diagnostic information to the programmable block screen
+        /// </summary>
+        void PrintDiagnosticHeader()
+        {
+            string header = "";
+            switch (runNumber)
+            {
+                case 0:
+                    header = "Farmhand -";
+                    break;
+                case 1:
+                    header = "Farmhand \\";
+                    break;
+                case 2:
+                    header = "Farmhand |";
+                    break;
+                case 3:
+                    header = "Farmhand /";
+                    break;
+            }
+
+            WriteToDiagnosticOutput(header);
+            WriteToDiagnosticOutput($"{Version} | ({PublishedDate})");
+            WriteToDiagnosticOutput("");
+
+            if (runNumber >= 3)
+            {
+                runNumber = 0;
+            }
+            else
+            {
+                runNumber += 1;
+            }
+
+            // Print diagnostic info once per cycle
+            farmGroups
+                .GetAllGroups()
+                .ForEach(farmGroup =>
+                {
+                    WriteToDiagnosticOutput($"Group: {farmGroup.GroupName}");
+                    if (farmGroup.FarmPlots.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"  Farm Plots: {farmGroup.FarmPlots.Count}");
+                    }
+                    if (farmGroup.IrrigationSystems.Count > 0)
+                    {
+                        WriteToDiagnosticOutput(
+                            $"  Irrigation Systems: {farmGroup.IrrigationSystems.Count}"
+                        );
+                    }
+                    if (farmGroup.LcdPanels.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"  LCD Panels: {farmGroup.LcdPanels.Count}");
+                    }
+                    if (farmGroup.Cockpits.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"  Control Seats: {farmGroup.Cockpits.Count}");
+                    }
+                    if (farmGroup.AirVents.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"  Air Vents: {farmGroup.AirVents.Count}");
+                    }
+                    if (farmGroup.StateManager.RegisteredTimerCount > 0)
+                    {
+                        WriteToDiagnosticOutput(
+                            $"  Timers: {farmGroup.StateManager.RegisteredTimerCount}"
+                        );
+                    }
+                });
+        }
+
+        /// <summary>
+        /// Prints header to LCD panels and cockpits (coroutine version)
+        /// </summary>
+        IEnumerator<bool> PrintHeaderCoroutine()
+        {
+            string header = "";
+            switch (runNumber - 1)
+            {
+                case -1:
+                    header = "Farmhand /";
+                    break;
+                case 0:
+                    header = "Farmhand -";
+                    break;
+                case 1:
+                    header = "Farmhand \\";
+                    break;
+                case 2:
+                    header = "Farmhand |";
+                    break;
+            }
+
+            farmGroups
+                .GetAllGroups()
+                .ForEach(farmGroup =>
+                {
+                    WriteToMainOutput(farmGroup.GroupName, header, "Header");
+                    WriteToMainOutput(farmGroup.GroupName, "", "Header");
+                });
+
+            yield return true;
         }
 
         /// <summary>
@@ -174,8 +249,6 @@ namespace IngameScript
                 }
             });
 
-            yield return true; // Yield after block processing
-
             var groupNames = lcdPanels
                 .ConvertAll(panel => panel.GroupName())
                 .FindAll(name => !string.IsNullOrWhiteSpace(name))
@@ -196,12 +269,6 @@ namespace IngameScript
                 groupNames.Add(pbGroupName);
             }
 
-            yield return true; // Yield after group name processing
-
-            // Get all block group names on the grid to filter out invalid farm group names
-            var gridBlockGroups = new List<IMyBlockGroup>();
-            GridTerminalSystem.GetBlockGroups(gridBlockGroups);
-
             // Remove those farm groups that are no longer referenced by any LCD panel or this programmable block
             farmGroups.RemoveGroupsNotInList(groupNames);
 
@@ -210,24 +277,29 @@ namespace IngameScript
             // For each group name, find and register the blocks
             foreach (var groupName in groupNames)
             {
-                if (gridBlockGroups.Find(g => g.Name == groupName) == null)
-                {
-                    // Group is no longer accessible from this programmable block
-                    continue;
-                }
-
                 var lcdPanelsInGroup = lcdPanels.FindAll(panel => panel.GroupName() == groupName);
                 var cockpitsInGroup = cockpits.FindAll(cockpit => cockpit.GroupName() == groupName);
                 farmGroups.ResetBlocks(groupName, lcdPanelsInGroup, cockpitsInGroup);
-                yield return true;
+
+                var group = farmGroups.GetGroup(groupName);
+
                 farmGroups.FindFarmPlots(groupName);
-                yield return true;
+
+                // Wait a tick if there are more than 50 farm plots to process
+                if (group.FarmPlots.Count > 50)
+                {
+                    yield return true;
+                }
+
                 farmGroups.FindIrrigationSystems(groupName);
-                yield return true;
                 farmGroups.FindAirVents(groupName);
-                yield return true;
                 farmGroups.FindTimers(groupName);
-                yield return true; // Yield after each group
+
+                // Wait a tick if there are more than 2 groups to process
+                if (groupNames.Count > 2)
+                {
+                    yield return true;
+                }
             }
         }
 
@@ -236,7 +308,6 @@ namespace IngameScript
         /// </summary>
         IEnumerator<bool> GetBlockStateCoroutine()
         {
-            Echo("GetBlockStateCoroutine");
             var allGroups = farmGroups.GetAllGroups();
 
             foreach (var farmGroup in allGroups)
@@ -304,12 +375,10 @@ namespace IngameScript
                             seedsNeeded += farmPlot.SeedsNeeded;
                         }
 
-                        if (farmPlot.WaterFilledRatio > thisPb.WaterLowThreshold)
-                        {
-                            farmPlot.LightBlinkInterval = 0f;
-                            farmPlot.LightBlinkLength = 1f;
-                        }
-                        else
+                        if (
+                            farmPlot.IsFunctional()
+                            && farmPlot.WaterFilledRatio <= thisPb.WaterLowThreshold
+                        )
                         {
                             farmPlot.LightBlinkInterval = 1f;
                             farmPlot.LightBlinkLength = 50f;
@@ -317,6 +386,11 @@ namespace IngameScript
                                 $"  {farmPlot.CustomName} Water Low: {farmPlot.WaterFilledRatio:P1}"
                             );
                             farmPlotsLowOnWater++;
+                        }
+                        else
+                        {
+                            farmPlot.LightBlinkInterval = 0f;
+                            farmPlot.LightBlinkLength = 1f;
                         }
                     });
 
@@ -466,10 +540,7 @@ namespace IngameScript
         /// </summary>
         IEnumerator<bool> PrintOutputCoroutine()
         {
-            Echo("PrintOutputCoroutine");
-
             thisPb.FlushTextToScreen();
-            yield return true; // Yield after programmable block screen flush
 
             var allGroups = farmGroups.GetAllGroups();
             foreach (var farmGroup in allGroups)
@@ -482,52 +553,9 @@ namespace IngameScript
                 {
                     cockpit.FlushTextToScreens();
                 });
-                yield return true; // Yield after each farm group's displays
-            }
-        }
-
-        /// <summary>
-        /// Prints the application header and version information
-        /// </summary>
-        void PrintHeader()
-        {
-            string header = "";
-            switch (runNumber)
-            {
-                case 0:
-                    header = "Farmhand -";
-                    break;
-                case 1:
-                    header = "Farmhand \\";
-                    break;
-                case 2:
-                    header = "Farmhand |";
-                    break;
-                case 3:
-                    header = "Farmhand /";
-                    break;
             }
 
-            WriteToDiagnosticOutput(header);
-            WriteToDiagnosticOutput($"{Version} | ({PublishedDate})");
-            WriteToDiagnosticOutput("");
-
-            farmGroups
-                .GetAllGroups()
-                .ForEach(farmGroup =>
-                {
-                    WriteToMainOutput(farmGroup.GroupName, header, "Header");
-                    WriteToMainOutput(farmGroup.GroupName, "", "Header");
-                });
-
-            if (runNumber >= 3)
-            {
-                runNumber = 0;
-            }
-            else
-            {
-                runNumber += 1;
-            }
+            yield return true;
         }
 
         /// <summary>
