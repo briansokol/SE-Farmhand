@@ -257,7 +257,6 @@ namespace IngameScript
         {
             if (IsFunctional() && _lcdScreen != null)
             {
-                _program.Echo(text);
                 _lcdOutput.AppendLine(text);
             }
         }

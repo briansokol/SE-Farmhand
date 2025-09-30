@@ -96,23 +96,38 @@ namespace IngameScript
         /// <param name="groupName">Name of the farm group</param>
         /// <param name="lcdPanels">LCD panels to add to the group</param>
         /// <param name="cockpits">Cockpits to add to the group</param>
-        public void FindBlocks(string groupName, List<LcdPanel> lcdPanels, List<Cockpit> cockpits)
+        public void ResetBlocks(string groupName, List<LcdPanel> lcdPanels, List<Cockpit> cockpits)
         {
             var group = GetGroup(groupName);
             group.Clear();
 
             group.LcdPanels.AddRange(lcdPanels);
             group.Cockpits.AddRange(cockpits);
+        }
 
-            // Find the block group by name
+        /// <summary>
+        /// Discovers and registers farm plots for the specified group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group</param>
+        public void FindFarmPlots(string groupName)
+        {
+            var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
 
-            // Find the farm plots in the group
             List<IMyFunctionalBlock> validFarmPlots = new List<IMyFunctionalBlock>();
             blockGroup?.GetBlocksOfType(validFarmPlots, block => FarmPlot.BlockIsValid(block));
             validFarmPlots.ForEach(block => group.FarmPlots.Add(new FarmPlot(block, program)));
+        }
 
-            // Find the irrigation systems in the group
+        /// <summary>
+        /// Discovers and registers irrigation systems for the specified group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group</param>
+        public void FindIrrigationSystems(string groupName)
+        {
+            var group = GetGroup(groupName);
+            IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
             List<IMyGasGenerator> validIrrigationSystems = new List<IMyGasGenerator>();
             blockGroup?.GetBlocksOfType(
                 validIrrigationSystems,
@@ -121,13 +136,31 @@ namespace IngameScript
             validIrrigationSystems.ForEach(block =>
                 group.IrrigationSystems.Add(new IrrigationSystem(block, program))
             );
+        }
 
-            // Find the air vents in the group
+        /// <summary>
+        /// Discovers and registers air vents for the specified group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group</param>
+        public void FindAirVents(string groupName)
+        {
+            var group = GetGroup(groupName);
+            IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
             List<IMyAirVent> validAirVents = new List<IMyAirVent>();
             blockGroup?.GetBlocksOfType(validAirVents, block => AirVent.BlockIsValid(block));
             validAirVents.ForEach(block => group.AirVents.Add(new AirVent(block, program)));
+        }
 
-            //Find the timers in the group
+        /// <summary>
+        /// Discovers and registers timers for the specified group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group</param>
+        public void FindTimers(string groupName)
+        {
+            var group = GetGroup(groupName);
+            IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
             List<IMyTimerBlock> validTimers = new List<IMyTimerBlock>();
             blockGroup?.GetBlocksOfType(validTimers, block => Timer.BlockIsValid(block));
             validTimers.ForEach(block =>

@@ -13,7 +13,7 @@ This is a **Space Engineers Programmable Block Script** for automated farm manag
 - **Build System**: MDK2 (Malware Development Kit 2)
 - **Package Manager**: NuGet
 
-## ⚠️ CRITICAL: C# 6.0 Language Constraints
+## CRITICAL: C# 6.0 Language Constraints
 
 **ALL CODE MUST BE COMPATIBLE WITH C# 6.0**. This project is constrained to C# 6.0 syntax and features due to Space Engineers API limitations. DO NOT use features from C# 7.0 or later, including:
 
