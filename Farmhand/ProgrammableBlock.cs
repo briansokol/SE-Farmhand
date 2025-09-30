@@ -66,15 +66,23 @@ namespace IngameScript
                 new CustomDataConfig(
                     "Ice Low Threshold",
                     "0.2",
-                    "Low Ice percent threshold, between 0.0 and 1.0 (default: 0.2)"
+                    "Low ice percent threshold, between 0.0 and 1.0 (default: 0.2)"
                 )
             },
             {
                 "WaterLowThreshold",
                 new CustomDataConfig(
                     "Water Low Threshold",
-                    "0.2",
-                    "Low Water percent threshold, between 0.0 and 1.0 (default: 0.2)"
+                    "0.5",
+                    "Low water percent threshold, between 0.0 and 1.0 (default: 0.5)"
+                )
+            },
+            {
+                "HealthLowThreshold",
+                new CustomDataConfig(
+                    "Health Low Threshold",
+                    "1.0",
+                    "Low health percent threshold, between 0.0 and 1.0 (default: 1.0)"
                 )
             },
         };
@@ -216,6 +224,29 @@ namespace IngameScript
                 }
                 // Return default if parsing fails
                 return 0.2f;
+            }
+        }
+
+        /// <summary>
+        /// Gets the health low threshold percentage
+        /// </summary>
+        public float HealthLowThreshold
+        {
+            get
+            {
+                ParseCustomData();
+                var thresholdString = _customData
+                    .Get(_customDataHeader, _customDataConfigs["HealthLowThreshold"].Label)
+                    .ToString(_customDataConfigs["HealthLowThreshold"].DefaultValue);
+
+                float threshold;
+                if (float.TryParse(thresholdString, out threshold))
+                {
+                    // Clamp between 0.0 and 1.0
+                    return Math.Max(0.0f, Math.Min(1.0f, threshold));
+                }
+                // Return default if parsing fails
+                return 1.0f;
             }
         }
 

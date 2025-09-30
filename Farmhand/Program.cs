@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using Sandbox.ModAPI.Ingame;
 using SpaceEngineers.Game.ModAPI.Ingame;
@@ -17,7 +16,7 @@ namespace IngameScript
         readonly string lcdTag = "FarmLCD";
         int runNumber = 0;
         readonly string Version = "v0.7.0";
-        readonly string PublishedDate = "2025-09-29";
+        readonly string PublishedDate = "2025-09-30";
 
         // Coroutine management
         readonly List<IEnumerator<bool>> activeCoroutines = new List<IEnumerator<bool>>();
@@ -123,28 +122,9 @@ namespace IngameScript
         /// </summary>
         void PrintDiagnosticHeader()
         {
-            string header = "";
-            switch (runNumber)
-            {
-                case 0:
-                    header = "Farmhand -";
-                    break;
-                case 1:
-                    header = "Farmhand \\";
-                    break;
-                case 2:
-                    header = "Farmhand |";
-                    break;
-                case 3:
-                    header = "Farmhand /";
-                    break;
-            }
+            var header = GetHeaderAnimation(runNumber);
 
-            WriteToDiagnosticOutput(header);
-            WriteToDiagnosticOutput($"{Version} | ({PublishedDate})");
-            WriteToDiagnosticOutput("");
-
-            if (runNumber >= 3)
+            if (runNumber >= 2)
             {
                 runNumber = 0;
             }
@@ -152,6 +132,10 @@ namespace IngameScript
             {
                 runNumber += 1;
             }
+
+            WriteToDiagnosticOutput(header);
+            WriteToDiagnosticOutput($"{Version} | ({PublishedDate})");
+            WriteToDiagnosticOutput("");
 
             // Print diagnostic info once per cycle
             farmGroups
@@ -162,12 +146,6 @@ namespace IngameScript
                     if (farmGroup.FarmPlots.Count > 0)
                     {
                         WriteToDiagnosticOutput($"  Farm Plots: {farmGroup.FarmPlots.Count}");
-                        // farmGroup.FarmPlots.ForEach(farmPlot =>
-                        // {
-                        //     WriteToDiagnosticOutput(
-                        //         $"{farmPlot.GetDetailedInfoWithoutRequiredInput()}"
-                        //     );
-                        // });
                     }
                     if (farmGroup.IrrigationSystems.Count > 0)
                     {
@@ -201,22 +179,7 @@ namespace IngameScript
         /// </summary>
         IEnumerator<bool> PrintHeaderCoroutine()
         {
-            string header = "";
-            switch (runNumber - 1)
-            {
-                case -1:
-                    header = "Farmhand /";
-                    break;
-                case 0:
-                    header = "Farmhand -";
-                    break;
-                case 1:
-                    header = "Farmhand \\";
-                    break;
-                case 2:
-                    header = "Farmhand |";
-                    break;
-            }
+            var header = GetHeaderAnimation(runNumber);
 
             farmGroups
                 .GetAllGroups()
@@ -320,25 +283,25 @@ namespace IngameScript
             {
                 var groupName = farmGroup.GroupName;
 
-                int seedsNeeded = 0;
-                int deadPlants = 0;
-                float waterUsagePerMinute = 0f;
-                List<string> causesOfDeath = new List<string>();
-                Dictionary<string, int> plotSummary = new Dictionary<string, int>();
-                Dictionary<string, int> yieldSummary = new Dictionary<string, int>();
-                Dictionary<string, float> growthSummary = new Dictionary<string, float>();
-
-                List<string> farmPlotMessages = new List<string>();
-                List<string> atmosphereMessages = new List<string>();
-                List<string> irrigationMessages = new List<string>();
-                List<string> yieldMessages = new List<string>();
-                List<string> alertMessages = new List<string>();
+                var farmPlotMessages = new List<string>();
+                var atmosphereMessages = new List<string>();
+                var irrigationMessages = new List<string>();
+                var yieldMessages = new List<string>();
+                var alertMessages = new List<string>();
 
                 // Check farm plots
                 if (farmGroup.FarmPlots.Count > 0)
                 {
+                    var seedsNeeded = 0;
+                    var deadPlants = 0;
+                    var dyingPlants = 0;
                     var farmPlotsLowOnWater = 0;
                     var farmPlotsReadyToHarvest = 0;
+                    var waterUsagePerMinute = 0f;
+                    var causesOfDeath = new List<string>();
+                    var plotSummary = new Dictionary<string, int>();
+                    var yieldSummary = new Dictionary<string, int>();
+                    var growthSummary = new Dictionary<string, float>();
 
                     farmGroup.FarmPlots.ForEach(farmPlot =>
                     {
@@ -357,11 +320,12 @@ namespace IngameScript
                                     ? plotSummary[plantType] + 1
                                     : 1;
 
-                                if (plotDetails.CropHealth < 1f)
+                                if (plotDetails.CropHealth < thisPb.HealthLowThreshold)
                                 {
                                     alertMessages.Add(
                                         $"  Health Low: {plotDetails.CropHealth:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
                                     );
+                                    dyingPlants++;
                                 }
 
                                 if (farmPlot.IsPlantFullyGrown)
@@ -430,6 +394,7 @@ namespace IngameScript
                         }
                     });
 
+                    farmGroup.StateManager.UpdateState("OnCropDying", dyingPlants > 0);
                     farmGroup.StateManager.UpdateState("OnWaterLow", farmPlotsLowOnWater > 0);
 
                     // Check air vents
@@ -652,6 +617,22 @@ namespace IngameScript
         void WriteToDiagnosticOutput(string text)
         {
             thisPb.AppendText(text);
+        }
+
+        string GetHeaderAnimation(int runNumber)
+        {
+            var title = "Farmhand";
+            switch (runNumber)
+            {
+                case 0:
+                    return $"{title} •––";
+                case 1:
+                    return $"{title} –•–";
+                case 2:
+                    return $"{title} ––•";
+                default:
+                    return title;
+            }
         }
     }
 }

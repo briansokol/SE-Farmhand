@@ -107,6 +107,22 @@ namespace IngameScript
                 )
             },
             {
+                "OnCropDyingTrue",
+                new CustomDataConfig(
+                    "On Crop Dying",
+                    "false",
+                    "Triggers when at least one farm plot's health is below threshold"
+                )
+            },
+            {
+                "OnCropDyingFalse",
+                new CustomDataConfig(
+                    "On Crop Not Dying",
+                    "false",
+                    "Triggers when all farm plots' health are above threshold or all have died"
+                )
+            },
+            {
                 "OnCropDeadTrue",
                 new CustomDataConfig(
                     "On Crop Dead",
