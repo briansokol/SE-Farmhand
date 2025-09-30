@@ -35,6 +35,10 @@ namespace IngameScript
                 new CustomDataConfig("Show Alerts", "true", "Shows information requiring attention")
             },
             {
+                "ShowFarmPlots",
+                new CustomDataConfig("Show Farm Plots", "true", "Shows farm plot information")
+            },
+            {
                 "ShowAtmosphere",
                 new CustomDataConfig("Show Atmosphere", "true", "Shows atmospheric information")
             },

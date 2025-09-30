@@ -162,6 +162,12 @@ namespace IngameScript
                     if (farmGroup.FarmPlots.Count > 0)
                     {
                         WriteToDiagnosticOutput($"  Farm Plots: {farmGroup.FarmPlots.Count}");
+                        // farmGroup.FarmPlots.ForEach(farmPlot =>
+                        // {
+                        //     WriteToDiagnosticOutput(
+                        //         $"{farmPlot.GetDetailedInfoWithoutRequiredInput()}"
+                        //     );
+                        // });
                     }
                     if (farmGroup.IrrigationSystems.Count > 0)
                     {
@@ -316,9 +322,13 @@ namespace IngameScript
 
                 int seedsNeeded = 0;
                 int deadPlants = 0;
+                float waterUsagePerMinute = 0f;
+                List<string> causesOfDeath = new List<string>();
                 Dictionary<string, int> plotSummary = new Dictionary<string, int>();
                 Dictionary<string, int> yieldSummary = new Dictionary<string, int>();
+                Dictionary<string, float> growthSummary = new Dictionary<string, float>();
 
+                List<string> farmPlotMessages = new List<string>();
                 List<string> atmosphereMessages = new List<string>();
                 List<string> irrigationMessages = new List<string>();
                 List<string> yieldMessages = new List<string>();
@@ -334,6 +344,9 @@ namespace IngameScript
                     {
                         var plantType = farmPlot.PlantType;
                         var plantYield = farmPlot.PlantYieldAmount;
+                        var plotDetails = farmPlot.GetPlotDetails();
+
+                        waterUsagePerMinute += plotDetails.WaterUsage;
 
                         if (farmPlot.IsPlantPlanted)
                         {
@@ -343,6 +356,13 @@ namespace IngameScript
                                 plotSummary[plantType] = plotSummary.ContainsKey(plantType)
                                     ? plotSummary[plantType] + 1
                                     : 1;
+
+                                if (plotDetails.CropHealth < 1f)
+                                {
+                                    alertMessages.Add(
+                                        $"  Health Low: {plotDetails.CropHealth:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
+                                    );
+                                }
 
                                 if (farmPlot.IsPlantFullyGrown)
                                 {
@@ -359,6 +379,17 @@ namespace IngameScript
                                 {
                                     // Plant is still growing
                                     farmPlot.SetLightColor(thisPb.PlantedAliveColor);
+
+                                    if (
+                                        !growthSummary.ContainsKey(plantType)
+                                        || (
+                                            plotDetails.GrowthProgress > growthSummary[plantType]
+                                            && plotDetails.GrowthProgress < 1f
+                                        )
+                                    )
+                                    {
+                                        growthSummary[plantType] = plotDetails.GrowthProgress;
+                                    }
                                 }
                             }
                             else
@@ -366,6 +397,11 @@ namespace IngameScript
                                 // Plant is dead
                                 farmPlot.SetLightColor(thisPb.PlantedDeadColor);
                                 deadPlants++;
+                                causesOfDeath.Add(
+                                    string.IsNullOrWhiteSpace(plotDetails.CauseOfDeath)
+                                        ? "Unknown"
+                                        : plotDetails.CauseOfDeath
+                                );
                             }
                         }
                         else
@@ -383,7 +419,7 @@ namespace IngameScript
                             farmPlot.LightBlinkInterval = 1f;
                             farmPlot.LightBlinkLength = 50f;
                             alertMessages.Add(
-                                $"  {farmPlot.CustomName} Water Low: {farmPlot.WaterFilledRatio:P1}"
+                                $"  Water Low: {farmPlot.WaterFilledRatio:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
                             );
                             farmPlotsLowOnWater++;
                         }
@@ -449,21 +485,28 @@ namespace IngameScript
                     // Additional alerts
                     if (deadPlants > 0)
                     {
-                        alertMessages.Add($"  Dead Plants: {deadPlants}");
+                        farmPlotMessages.Add(
+                            $"  Dead Plants: {deadPlants} ({string.Join(", ", causesOfDeath.Distinct())})"
+                        );
                     }
                     farmGroup.StateManager.UpdateState("OnCropDead", deadPlants > 0);
 
                     if (seedsNeeded > 0)
                     {
-                        alertMessages.Add($"  Available Plots: {seedsNeeded}");
+                        farmPlotMessages.Add($"  Available Plots: {seedsNeeded}");
                     }
                     farmGroup.StateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
 
                     if (farmPlotsReadyToHarvest > 0)
                     {
-                        alertMessages.Add($"  Harvest Ready Plots: {farmPlotsReadyToHarvest}");
+                        farmPlotMessages.Add($"  Harvest Ready Plots: {farmPlotsReadyToHarvest}");
                     }
                     farmGroup.StateManager.UpdateState("OnCropReady", farmPlotsReadyToHarvest > 0);
+
+                    if (waterUsagePerMinute > 0f)
+                    {
+                        farmPlotMessages.Add($"  Water Usage: {waterUsagePerMinute:F1} L/min");
+                    }
 
                     // Check if all planted crops are ready to harvest
                     var totalPlantedPlots = 0;
@@ -488,8 +531,22 @@ namespace IngameScript
                             int plantYield = yieldSummary.ContainsKey(entry.Key)
                                 ? yieldSummary[entry.Key]
                                 : 0;
+                            float growthProgress = growthSummary.ContainsKey(entry.Key)
+                                ? growthSummary[entry.Key]
+                                : 0f;
+
+                            var yieldText = new List<string>();
+                            if (growthProgress > 0f)
+                            {
+                                yieldText.Add($"{growthProgress:P1}");
+                            }
+                            if (plantYield > 0)
+                            {
+                                yieldText.Add($"{plantYield} Ready");
+                            }
+
                             yieldMessages.Add(
-                                $"  {entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {(plantYield == 0 ? "Growing" : plantYield.ToString())}"
+                                $"  {entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {string.Join(", ", yieldText)}"
                             );
                         }
                     }
@@ -502,6 +559,15 @@ namespace IngameScript
                         WriteToMainOutput(groupName, message, "ShowAlerts")
                     );
                     WriteToMainOutput(groupName, "", "ShowAlerts");
+                }
+
+                if (farmPlotMessages.Count > 0)
+                {
+                    WriteToMainOutput(groupName, "Farm Plots", "ShowFarmPlots");
+                    farmPlotMessages.ForEach(message =>
+                        WriteToMainOutput(groupName, message, "ShowFarmPlots")
+                    );
+                    WriteToMainOutput(groupName, "", "ShowFarmPlots");
                 }
 
                 if (atmosphereMessages.Count > 0)

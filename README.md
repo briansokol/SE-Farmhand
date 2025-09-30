@@ -16,16 +16,14 @@ A Space Engineers programmable block script for automated farm management.
 
 1. Build the project using Visual Studio or `dotnet build`
 2. Deploy the compiled script to a Programmable Block in Space Engineers
-3. Configure the block group name in the Programmable Block's custom data
-4. Add farm plots, irrigation systems, LCD panels, air vents, and timer blocks to the named group
-5. Configure timer automation events via custom data on individual timer blocks
+3. Add [FarmLCD] to an LCD or Control Seat name
+4. Configure the block group name in the LCD or Control Seat's custom data
+5. Add farm plots, irrigation systems, air vents, and timer blocks to the named group
+6. Configure timer automation events via custom data on individual timer blocks
 
-## Status Indicators (Configurable)
+## Links
 
-- **Purple Light**: Empty planter
-- **White Light**: Plant growing
-- **Cyan Blinking**: Ready to harvest
-- **Red Light**: Dead plant
-- **Fast Blinking**: Low water warning
+- [Mod Page](https://steamcommunity.com/sharedfiles/filedetails/?id=3571837091)
+- [Official Guide](https://steamcommunity.com/sharedfiles/filedetails/?id=3575736083)
 
 Built with [MDK2](https://github.com/malware-dev/MDK-SE) for Space Engineers.

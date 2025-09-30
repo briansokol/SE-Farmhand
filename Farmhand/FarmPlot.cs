@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.Components;
@@ -6,6 +7,37 @@ using VRageMath;
 
 namespace IngameScript
 {
+    /// <summary>
+    /// Represents parsed detailed information from a farm plot
+    /// </summary>
+    public class FarmPlotDetails
+    {
+        /// <summary>
+        /// Growth progress as a percentage (0.0 to 100.0)
+        /// </summary>
+        public float GrowthProgress { get; set; } = 0f;
+
+        /// <summary>
+        /// Time current crop has been growing
+        /// </summary>
+        public TimeSpan GrowTime { get; set; } = TimeSpan.Zero;
+
+        /// <summary>
+        /// Crop health as a percentage (0.0 to 1.0)
+        /// </summary>
+        public float CropHealth { get; set; } = 0f;
+
+        /// <summary>
+        /// Current water usage rate in liters per minute
+        /// </summary>
+        public float WaterUsage { get; set; } = 0f;
+
+        /// <summary>
+        /// Cause of death for dead crops (e.g., "Exposure", "Dehydration")
+        /// </summary>
+        public string CauseOfDeath { get; set; } = string.Empty;
+    }
+
     /// <summary>
     /// Manages agricultural plots with plant monitoring, lighting control, and harvest tracking
     /// </summary>
@@ -114,6 +146,123 @@ namespace IngameScript
         /// </summary>
         public double WaterFilledRatio =>
             IsFunctional() && _storageComponent != null ? _storageComponent.FilledRatio : 0f;
+
+        public string GetDetailedInfoWithoutRequiredInput()
+        {
+            return IsFunctional() && _farmPlotLogic != null
+                ? _farmPlotLogic.GetDetailedInfoWithoutRequiredInput()
+                : string.Empty;
+        }
+
+        /// <summary>
+        /// Parses the detailed info string from the farm plot into structured data
+        /// </summary>
+        /// <returns>Parsed farm plot details, or null if parsing fails</returns>
+        public FarmPlotDetails GetPlotDetails()
+        {
+            if (_farmPlotLogic == null)
+            {
+                return null;
+            }
+
+            string detailsText = _farmPlotLogic.GetDetailedInfoWithoutRequiredInput();
+            if (string.IsNullOrWhiteSpace(detailsText))
+            {
+                return null;
+            }
+
+            var details = new FarmPlotDetails();
+            string[] lines = detailsText.Split('\n');
+
+            foreach (string line in lines)
+            {
+                string trimmedLine = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmedLine))
+                {
+                    continue;
+                }
+
+                // Remove color formatting tags like [Color=#FFFF0000]...[/Color]
+                if (trimmedLine.StartsWith("[Color="))
+                {
+                    int endBracket = trimmedLine.IndexOf(']');
+                    if (endBracket > 0)
+                    {
+                        trimmedLine = trimmedLine.Substring(endBracket + 1);
+                    }
+                }
+                if (trimmedLine.EndsWith("[/Color]"))
+                {
+                    trimmedLine = trimmedLine.Substring(0, trimmedLine.Length - 8);
+                }
+
+                // Split on first colon to get key and value
+                int colonIndex = trimmedLine.IndexOf(':');
+                if (colonIndex < 0)
+                {
+                    continue;
+                }
+
+                string key = trimmedLine.Substring(0, colonIndex).Trim();
+                string value = trimmedLine.Substring(colonIndex + 1).Trim();
+
+                switch (key)
+                {
+                    case "Growth Progress":
+                        // Parse "100.00%" -> 100.0
+                        value = value.Replace("%", "");
+                        float growthProgress;
+                        if (float.TryParse(value, out growthProgress))
+                        {
+                            details.GrowthProgress = growthProgress / 100f; // Convert to 0.0 to 1.0 range
+                        }
+                        break;
+
+                    case "Grow Time":
+                        // Parse "00:30:00" -> TimeSpan
+                        TimeSpan growTime;
+                        if (TimeSpan.TryParse(value, out growTime))
+                        {
+                            details.GrowTime = growTime;
+                        }
+                        break;
+
+                    case "Crop Health":
+                        // Parse "100.00%" -> 100.0
+                        value = value.Replace("%", "");
+                        float cropHealth;
+                        if (float.TryParse(value, out cropHealth))
+                        {
+                            details.CropHealth = cropHealth / 100f; // Convert to 0.0 to 1.0 range
+                        }
+                        break;
+
+                    case "Current Water Usage":
+                        // Parse "1.6 L/min" -> 1.6
+                        int spaceIndex = value.IndexOf(' ');
+                        if (spaceIndex > 0)
+                        {
+                            string numberPart = value.Substring(0, spaceIndex).Trim();
+                            float waterUsage;
+                            if (float.TryParse(numberPart, out waterUsage))
+                            {
+                                details.WaterUsage = waterUsage;
+                            }
+                        }
+                        break;
+
+                    case "Cause of Death":
+                        details.CauseOfDeath = value;
+                        break;
+
+                    default:
+                        // Unknown key, ignore
+                        break;
+                }
+            }
+
+            return details;
+        }
 
         /// <summary>
         /// Gets or sets the color of the integrated lighting in the farm plot
