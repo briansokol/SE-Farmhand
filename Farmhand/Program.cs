@@ -255,6 +255,7 @@ namespace IngameScript
                 farmGroups.ResetBlocks(groupName, lcdPanelsInGroup, cockpitsInGroup);
 
                 var group = farmGroups.GetGroup(groupName);
+                group.ProgrammableBlock = thisPb;
 
                 farmGroups.FindFarmPlots(groupName);
 
@@ -287,60 +288,50 @@ namespace IngameScript
             {
                 var groupName = farmGroup.GroupName;
 
-                var farmPlotMessages = new List<string>();
-                var atmosphereMessages = new List<string>();
-                var irrigationMessages = new List<string>();
-                var yieldMessages = new List<string>();
-                var alertMessages = new List<string>();
+                // Initialize stats for this farm group
+                var stats = new FarmStats();
 
                 // Check farm plots
                 if (farmGroup.FarmPlots.Count > 0)
                 {
-                    var seedsNeeded = 0;
-                    var deadPlants = 0;
-                    var dyingPlants = 0;
-                    var farmPlotsLowOnWater = 0;
-                    var farmPlotsReadyToHarvest = 0;
-                    var waterUsagePerMinute = 0f;
-                    var causesOfDeath = new List<string>();
-                    var plotSummary = new Dictionary<string, int>();
-                    var yieldSummary = new Dictionary<string, int>();
-                    var growthSummary = new Dictionary<string, float>();
-
                     farmGroup.FarmPlots.ForEach(farmPlot =>
                     {
                         var plantType = farmPlot.PlantType;
                         var plantYield = farmPlot.PlantYieldAmount;
                         var plotDetails = farmPlot.GetPlotDetails();
 
-                        waterUsagePerMinute += plotDetails.WaterUsage;
+                        stats.WaterUsagePerMinute += plotDetails.WaterUsage;
 
                         if (farmPlot.IsPlantPlanted)
                         {
                             if (farmPlot.IsPlantAlive)
                             {
                                 // Set the plot plant count
-                                plotSummary[plantType] = plotSummary.ContainsKey(plantType)
-                                    ? plotSummary[plantType] + 1
+                                stats.PlotSummary[plantType] = stats.PlotSummary.ContainsKey(
+                                    plantType
+                                )
+                                    ? stats.PlotSummary[plantType] + 1
                                     : 1;
 
                                 if (plotDetails.CropHealth < thisPb.HealthLowThreshold)
                                 {
-                                    alertMessages.Add(
+                                    stats.AlertMessages.Add(
                                         $"Health Low: {plotDetails.CropHealth:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
                                     );
-                                    dyingPlants++;
+                                    stats.DyingPlants++;
                                 }
 
                                 if (farmPlot.IsPlantFullyGrown)
                                 {
                                     // Plant is ready to harvest
                                     farmPlot.SetLightColor(thisPb.PlantedReadyColor);
-                                    farmPlotsReadyToHarvest++;
+                                    stats.FarmPlotsReadyToHarvest++;
 
                                     // Set the yield summary
-                                    yieldSummary[plantType] = yieldSummary.ContainsKey(plantType)
-                                        ? yieldSummary[plantType] + plantYield
+                                    stats.YieldSummary[plantType] = stats.YieldSummary.ContainsKey(
+                                        plantType
+                                    )
+                                        ? stats.YieldSummary[plantType] + plantYield
                                         : plantYield;
                                 }
                                 else
@@ -349,14 +340,15 @@ namespace IngameScript
                                     farmPlot.SetLightColor(thisPb.PlantedAliveColor);
 
                                     if (
-                                        !growthSummary.ContainsKey(plantType)
+                                        !stats.GrowthSummary.ContainsKey(plantType)
                                         || (
-                                            plotDetails.GrowthProgress > growthSummary[plantType]
+                                            plotDetails.GrowthProgress
+                                                > stats.GrowthSummary[plantType]
                                             && plotDetails.GrowthProgress < 1f
                                         )
                                     )
                                     {
-                                        growthSummary[plantType] = plotDetails.GrowthProgress;
+                                        stats.GrowthSummary[plantType] = plotDetails.GrowthProgress;
                                     }
                                 }
                             }
@@ -364,8 +356,8 @@ namespace IngameScript
                             {
                                 // Plant is dead
                                 farmPlot.SetLightColor(thisPb.PlantedDeadColor);
-                                deadPlants++;
-                                causesOfDeath.Add(
+                                stats.DeadPlants++;
+                                stats.CausesOfDeath.Add(
                                     string.IsNullOrWhiteSpace(plotDetails.CauseOfDeath)
                                         ? "Unknown"
                                         : plotDetails.CauseOfDeath
@@ -376,7 +368,7 @@ namespace IngameScript
                         {
                             // No plant
                             farmPlot.SetLightColor(thisPb.PlanterEmptyColor);
-                            seedsNeeded += farmPlot.SeedsNeeded;
+                            stats.SeedsNeeded += farmPlot.SeedsNeeded;
                         }
 
                         if (
@@ -386,10 +378,10 @@ namespace IngameScript
                         {
                             farmPlot.LightBlinkInterval = 1f;
                             farmPlot.LightBlinkLength = 50f;
-                            alertMessages.Add(
+                            stats.AlertMessages.Add(
                                 $"Water Low: {farmPlot.WaterFilledRatio:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
                             );
-                            farmPlotsLowOnWater++;
+                            stats.FarmPlotsLowOnWater++;
                         }
                         else
                         {
@@ -398,33 +390,35 @@ namespace IngameScript
                         }
                     });
 
-                    farmGroup.StateManager.UpdateState("OnCropDying", dyingPlants > 0);
-                    farmGroup.StateManager.UpdateState("OnWaterLow", farmPlotsLowOnWater > 0);
+                    farmGroup.StateManager.UpdateState("OnCropDying", stats.DyingPlants > 0);
+                    farmGroup.StateManager.UpdateState("OnWaterLow", stats.FarmPlotsLowOnWater > 0);
 
                     // Check air vents
                     if (farmGroup.AirVents.Count > 0)
                     {
                         var vent = farmGroup.AirVents[0];
+                        stats.OxygenLevel = vent.OxygenLevel;
 
                         switch (vent.Status)
                         {
                             case VentStatus.Pressurizing:
                             case VentStatus.Pressurized:
-                                atmosphereMessages.Add($"Pressurized: {vent.OxygenLevel:P0}");
+                                stats.VentStatusText = $"Pressurized: {vent.OxygenLevel:P0}";
+                                stats.IsPressurized = true;
                                 farmGroup.StateManager.UpdateState("OnPressurized", true);
                                 break;
                             case VentStatus.Depressurizing:
                             case VentStatus.Depressurized:
                                 if (vent.CanPressurize)
                                 {
-                                    atmosphereMessages.Add(
-                                        $"Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}"
-                                    );
+                                    stats.VentStatusText =
+                                        $"Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}";
                                 }
                                 else
                                 {
-                                    atmosphereMessages.Add($"Depressurized: {vent.OxygenLevel:P0}");
+                                    stats.VentStatusText = $"Depressurized: {vent.OxygenLevel:P0}";
                                 }
+                                stats.IsPressurized = false;
                                 farmGroup.StateManager.UpdateState("OnPressurized", false);
                                 break;
                         }
@@ -443,90 +437,117 @@ namespace IngameScript
                         });
 
                         var iceLowThreshold = thisPb.IceLowThreshold;
-                        var iceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
+                        stats.IceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
                         var currentIceKg = iceVolume / 0.37f;
                         var maxIceKg = inventoryVolume / 0.37f;
-                        irrigationMessages.Add(
-                            $"Ice: {iceRatio:P0} ({currentIceKg:F1} kg / {maxIceKg:F1} kg)"
-                        );
 
-                        farmGroup.StateManager.UpdateState("OnIceLow", iceRatio < iceLowThreshold);
-                    }
+                        // irrigationMessages.Add(
+                        //     $"Ice: {iceRatio:P0} ({currentIceKg:F1} kg / {maxIceKg:F1} kg)"
+                        // );
 
-                    // Additional alerts
-                    if (deadPlants > 0)
-                    {
-                        farmPlotMessages.Add(
-                            $"Dead Plants: {deadPlants} ({string.Join(", ", causesOfDeath.Distinct())})"
+                        farmGroup.StateManager.UpdateState(
+                            "OnIceLow",
+                            stats.IceRatio < iceLowThreshold
                         );
                     }
-                    farmGroup.StateManager.UpdateState("OnCropDead", deadPlants > 0);
 
-                    if (seedsNeeded > 0)
-                    {
-                        farmPlotMessages.Add($"Available Plots: {seedsNeeded}");
-                    }
-                    farmGroup.StateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
-
-                    if (farmPlotsReadyToHarvest > 0)
-                    {
-                        farmPlotMessages.Add($"Harvest Ready Plots: {farmPlotsReadyToHarvest}");
-                    }
-                    farmGroup.StateManager.UpdateState("OnCropReady", farmPlotsReadyToHarvest > 0);
-
-                    if (waterUsagePerMinute > 0f)
-                    {
-                        farmPlotMessages.Add($"Water Usage: {waterUsagePerMinute:F1} L/min");
-                    }
+                    // Update state manager with stats
+                    farmGroup.StateManager.UpdateState("OnCropDead", stats.DeadPlants > 0);
+                    farmGroup.StateManager.UpdateState("OnCropAvailable", stats.SeedsNeeded > 0);
+                    farmGroup.StateManager.UpdateState(
+                        "OnCropReady",
+                        stats.FarmPlotsReadyToHarvest > 0
+                    );
 
                     // Check if all planted crops are ready to harvest
-                    var totalPlantedPlots = 0;
                     farmGroup.FarmPlots.ForEach(farmPlot =>
                     {
                         if (farmPlot.IsPlantPlanted && farmPlot.IsPlantAlive)
                         {
-                            totalPlantedPlots++;
+                            stats.TotalPlantedPlots++;
                         }
                     });
 
                     farmGroup.StateManager.UpdateState(
                         "OnAllCropsReady",
-                        totalPlantedPlots > 0 && farmPlotsReadyToHarvest == totalPlantedPlots
+                        stats.TotalPlantedPlots > 0
+                            && stats.FarmPlotsReadyToHarvest == stats.TotalPlantedPlots
                     );
+                }
 
-                    // Yield summary
-                    if (plotSummary.Count > 0)
+                // Store stats in the farm group
+                farmGroup.Stats = stats;
+
+                // Build text messages from stats for text-mode displays
+                var farmPlotMessages = new List<string>();
+                var atmosphereMessages = new List<string>();
+                var irrigationMessages = new List<string>();
+                var yieldMessages = new List<string>();
+
+                if (stats.DeadPlants > 0)
+                {
+                    farmPlotMessages.Add(
+                        $"  Dead Plants: {stats.DeadPlants} ({string.Join(", ", stats.CausesOfDeath.Distinct())})"
+                    );
+                }
+
+                if (stats.SeedsNeeded > 0)
+                {
+                    farmPlotMessages.Add($"  Available Plots: {stats.SeedsNeeded}");
+                }
+
+                if (stats.FarmPlotsReadyToHarvest > 0)
+                {
+                    farmPlotMessages.Add($"  Harvest Ready Plots: {stats.FarmPlotsReadyToHarvest}");
+                }
+
+                if (stats.WaterUsagePerMinute > 0f)
+                {
+                    farmPlotMessages.Add($"  Water Usage: {stats.WaterUsagePerMinute:F1} L/min");
+                }
+
+                if (!string.IsNullOrWhiteSpace(stats.VentStatusText))
+                {
+                    atmosphereMessages.Add(stats.VentStatusText);
+                }
+
+                if (farmGroup.IrrigationSystems.Count > 0)
+                {
+                    irrigationMessages.Add($"  Ice: {stats.IceRatio:P0}");
+                }
+
+                // Yield summary
+                if (stats.PlotSummary.Count > 0)
+                {
+                    foreach (KeyValuePair<string, int> entry in stats.PlotSummary)
                     {
-                        foreach (KeyValuePair<string, int> entry in plotSummary)
+                        int plantYield = stats.YieldSummary.ContainsKey(entry.Key)
+                            ? stats.YieldSummary[entry.Key]
+                            : 0;
+                        float growthProgress = stats.GrowthSummary.ContainsKey(entry.Key)
+                            ? stats.GrowthSummary[entry.Key]
+                            : 0f;
+
+                        var yieldText = new List<string>();
+                        if (growthProgress > 0f)
                         {
-                            int plantYield = yieldSummary.ContainsKey(entry.Key)
-                                ? yieldSummary[entry.Key]
-                                : 0;
-                            float growthProgress = growthSummary.ContainsKey(entry.Key)
-                                ? growthSummary[entry.Key]
-                                : 0f;
-
-                            var yieldText = new List<string>();
-                            if (growthProgress > 0f)
-                            {
-                                yieldText.Add($"{growthProgress:P1}");
-                            }
-                            if (plantYield > 0)
-                            {
-                                yieldText.Add($"{plantYield} Ready");
-                            }
-
-                            yieldMessages.Add(
-                                $"{entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {string.Join(", ", yieldText)}"
-                            );
+                            yieldText.Add($"{growthProgress:P1}");
                         }
+                        if (plantYield > 0)
+                        {
+                            yieldText.Add($"{plantYield} Ready");
+                        }
+
+                        yieldMessages.Add(
+                            $"  {entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {string.Join(", ", yieldText)}"
+                        );
                     }
                 }
 
-                if (alertMessages.Count > 0)
+                if (stats.AlertMessages.Count > 0)
                 {
                     WriteToMainOutput(groupName, "Alerts", "ShowAlerts", isHeader: true);
-                    alertMessages.ForEach(message =>
+                    stats.AlertMessages.ForEach(message =>
                         WriteToMainOutput(groupName, message, "ShowAlerts")
                     );
                     WriteToMainOutput(groupName, "", "ShowAlerts");
@@ -584,10 +605,12 @@ namespace IngameScript
             {
                 farmGroup.LcdPanels.ForEach(panel =>
                 {
+                    panel.SetFarmGroup(farmGroup);
                     panel.FlushTextToScreen();
                 });
                 farmGroup.Cockpits.ForEach(cockpit =>
                 {
+                    cockpit.SetFarmGroup(farmGroup);
                     cockpit.FlushTextToScreens();
                 });
             }

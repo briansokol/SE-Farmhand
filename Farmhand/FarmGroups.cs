@@ -17,6 +17,9 @@ namespace IngameScript
         public List<Cockpit> Cockpits { get; }
         public List<AirVent> AirVents { get; }
         public StateManager StateManager { get; }
+        public FarmStats Stats { get; set; }
+        public ProgrammableBlock ProgrammableBlock { get; set; }
+        public int RunNumber { get; set; }
 
         /// <summary>
         /// Initializes a new farm group with the specified name
@@ -31,6 +34,7 @@ namespace IngameScript
             Cockpits = new List<Cockpit>();
             AirVents = new List<AirVent>();
             StateManager = new StateManager();
+            Stats = new FarmStats();
         }
     }
 

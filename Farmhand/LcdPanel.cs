@@ -2,6 +2,7 @@
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
+using VRageMath;
 
 namespace IngameScript
 {
@@ -12,6 +13,7 @@ namespace IngameScript
     {
         private readonly IMyTextPanel _lcdPanel;
         protected readonly StringBuilder _lcdOutput = new StringBuilder();
+        private FarmGroup _farmGroup;
 
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
@@ -61,6 +63,14 @@ namespace IngameScript
                     "Text Alignment",
                     "left",
                     "Text alignment on screen (left or center)"
+                )
+            },
+            {
+                "GraphicalMode",
+                new CustomDataConfig(
+                    "Graphical Mode",
+                    "false",
+                    "Shows graphical UI instead of text (true/false)"
                 )
             },
         };
@@ -154,15 +164,34 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Checks if graphical mode is enabled
+        /// </summary>
+        /// <returns>True if graphical mode is enabled</returns>
+        public bool IsGraphicalMode()
+        {
+            ParseCustomData();
+            return _customData
+                .Get(_customDataHeader, _customDataConfigs["GraphicalMode"].Label)
+                .ToBoolean(false);
+        }
+
+        /// <summary>
         /// Flushes the accumulated text to the LCD panel and clears the buffer
         /// </summary>
         public void FlushTextToScreen()
         {
             if (IsFunctional() && _lcdPanel != null)
             {
-                _lcdPanel.ContentType = ContentType.TEXT_AND_IMAGE;
-                _lcdPanel.Alignment = GetTextAlignment();
-                _lcdPanel.WriteText(_lcdOutput.ToString(), false);
+                if (IsGraphicalMode())
+                {
+                    DrawGraphicalUI();
+                }
+                else
+                {
+                    _lcdPanel.ContentType = ContentType.TEXT_AND_IMAGE;
+                    _lcdPanel.Alignment = GetTextAlignment();
+                    _lcdPanel.WriteText(_lcdOutput.ToString(), false);
+                }
                 _lcdOutput.Clear();
             }
         }
@@ -191,6 +220,23 @@ namespace IngameScript
             {
                 return TextAlignment.LEFT;
             }
+        }
+
+        /// <summary>
+        /// Sets the farm group for this LCD panel (used to retrieve stats for graphical rendering)
+        /// </summary>
+        /// <param name="farmGroup">The farm group this LCD panel belongs to</param>
+        public void SetFarmGroup(FarmGroup farmGroup)
+        {
+            _farmGroup = farmGroup;
+        }
+
+        /// <summary>
+        /// Draws the graphical UI using sprites
+        /// </summary>
+        private void DrawGraphicalUI()
+        {
+            SpriteRenderer.DrawGraphicalUI(_lcdPanel, _farmGroup);
         }
 
         /// <summary>

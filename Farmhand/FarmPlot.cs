@@ -107,6 +107,14 @@ namespace IngameScript
                 : string.Empty;
 
         /// <summary>
+        /// Gets the full definition ID of plant currently plansted in this farm plot
+        /// </summary>
+        public string PlantId =>
+            IsFunctional() && _farmPlotLogic != null && _farmPlotLogic.OutputItem != null
+                ? $"{_farmPlotLogic.OutputItem.TypeId.ToString()}/{_farmPlotLogic.OutputItem.SubtypeName}"
+                : string.Empty;
+
+        /// <summary>
         /// Gets the amount of yield the current plant will produce when harvested
         /// </summary>
         public int PlantYieldAmount =>

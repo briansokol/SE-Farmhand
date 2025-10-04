@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## General Guidance
+
+**When there isn't a clear ideal solution to a problem, ASK QUESTIONS.** Don't make assumptions about implementation details, design preferences, or trade-offs without consulting the user first. Present options when multiple valid approaches exist.
+
 ## Project Overview
 
 This is a **Space Engineers Programmable Block Script** for automated farm management. The project uses the Malware Development Kit (MDK2) framework to develop, build, and deploy in-game scripts for Space Engineers.

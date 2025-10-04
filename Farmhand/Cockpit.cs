@@ -4,6 +4,7 @@ using System.Text;
 using Sandbox.Common.ObjectBuilders.Definitions;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
+using VRageMath;
 
 namespace IngameScript
 {
@@ -14,6 +15,7 @@ namespace IngameScript
     {
         private readonly IMyCockpit _cockpit;
         protected readonly List<StringBuilder> _lcdOutput = new List<StringBuilder>();
+        private FarmGroup _farmGroup;
 
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
@@ -78,6 +80,14 @@ namespace IngameScript
                     "Text Alignment",
                     "left",
                     "Text alignment on screen (left or center)"
+                )
+            },
+            {
+                "GraphicalMode",
+                new CustomDataConfig(
+                    "Graphical Mode",
+                    "false",
+                    "Shows graphical UI instead of text (set index of screen, false to disable)"
                 )
             },
         };
@@ -191,19 +201,61 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Gets the screen index for graphical mode display
+        /// </summary>
+        /// <returns>Screen index or -1 if graphical mode is disabled</returns>
+        public int GetGraphicalModeScreen()
+        {
+            try
+            {
+                ParseCustomData();
+                string configValue = _customData
+                    .Get(_customDataHeader, _customDataConfigs["GraphicalMode"].Label)
+                    .ToString("false");
+
+                if (configValue != "false")
+                {
+                    int screenIndex;
+                    if (int.TryParse(configValue, out screenIndex) && screenIndex >= 0)
+                    {
+                        return screenIndex;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore errors and fall through to return -1
+            }
+            return -1;
+        }
+
+        /// <summary>
         /// Flushes the accumulated text to the LCD panels and clears the buffer
         /// </summary>
         public void FlushTextToScreens()
         {
             if (IsFunctional() && _cockpit != null)
             {
+                int graphicalScreen = GetGraphicalModeScreen();
+
+                // Handle graphical mode screen
+                if (graphicalScreen >= 0 && graphicalScreen < _cockpit.SurfaceCount)
+                {
+                    DrawGraphicalUI(graphicalScreen);
+                    _lcdOutput[graphicalScreen].Clear();
+                }
+
+                // Handle text mode screens
                 foreach (var index in GetActiveScreens())
                 {
-                    var screen = _cockpit.GetSurface(index);
-                    screen.ContentType = ContentType.TEXT_AND_IMAGE;
-                    screen.Alignment = GetTextAlignment();
-                    screen.WriteText(_lcdOutput[index].ToString(), false);
-                    _lcdOutput[index].Clear();
+                    if (index != graphicalScreen)
+                    {
+                        var screen = _cockpit.GetSurface(index);
+                        screen.ContentType = ContentType.TEXT_AND_IMAGE;
+                        screen.Alignment = GetTextAlignment();
+                        screen.WriteText(_lcdOutput[index].ToString(), false);
+                        _lcdOutput[index].Clear();
+                    }
                 }
             }
         }
@@ -232,6 +284,25 @@ namespace IngameScript
             {
                 return TextAlignment.LEFT;
             }
+        }
+
+        /// <summary>
+        /// Sets the farm group for this cockpit (used to retrieve stats for graphical rendering)
+        /// </summary>
+        /// <param name="farmGroup">The farm group this cockpit belongs to</param>
+        public void SetFarmGroup(FarmGroup farmGroup)
+        {
+            _farmGroup = farmGroup;
+        }
+
+        /// <summary>
+        /// Draws the graphical UI using sprites on the specified screen
+        /// </summary>
+        /// <param name="screenIndex">Index of the screen to draw on</param>
+        private void DrawGraphicalUI(int screenIndex)
+        {
+            var screen = _cockpit.GetSurface(screenIndex);
+            SpriteRenderer.DrawGraphicalUI(screen, _farmGroup);
         }
 
         public int GetScreenForCategory(string category)
@@ -263,13 +334,19 @@ namespace IngameScript
         {
             ParseCustomData();
             List<int> activeScreens = new List<int>();
+            int graphicalScreen = GetGraphicalModeScreen();
 
             foreach (var entry in _customDataConfigs)
             {
                 if (entry.Key.StartsWith("Show"))
                 {
                     var screenIndex = GetScreenForCategory(entry.Key);
-                    if (screenIndex >= 0 && !activeScreens.Contains(screenIndex))
+                    // Exclude graphical screen from text category screens
+                    if (
+                        screenIndex >= 0
+                        && screenIndex != graphicalScreen
+                        && !activeScreens.Contains(screenIndex)
+                    )
                     {
                         activeScreens.Add(screenIndex);
                     }
