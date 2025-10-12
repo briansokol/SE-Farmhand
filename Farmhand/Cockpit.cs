@@ -302,7 +302,8 @@ namespace IngameScript
         private void DrawGraphicalUI(int screenIndex)
         {
             var screen = _cockpit.GetSurface(screenIndex);
-            SpriteRenderer.DrawGraphicalUI(screen, _farmGroup);
+            var renderer = new SpriteRenderer(screen, _farmGroup);
+            renderer.DrawGraphicalUI();
         }
 
         public int GetScreenForCategory(string category)

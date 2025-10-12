@@ -6,6 +6,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **When there isn't a clear ideal solution to a problem, ASK QUESTIONS.** Don't make assumptions about implementation details, design preferences, or trade-offs without consulting the user first. Present options when multiple valid approaches exist.
 
+## AI Behavior
+
+### Code Quality Principles
+
+1. **Avoid Code Duplication**: Always prefer refactoring code into reusable methods rather than duplicating logic. If you find yourself copying similar code blocks, extract them into a shared method.
+
+2. **Clarify Before Acting**: If a user's request is ambiguous or lacks necessary details, ask clarifying questions before proceeding with implementation. It's better to understand the requirements fully than to make incorrect assumptions.
+
+3. **Present Options**: When multiple valid approaches exist (different algorithms, architectures, or trade-offs), present the options to the user with pros and cons, and let them choose the direction. Don't arbitrarily pick one approach when the ideal solution isn't clear.
+
+### Code Organization
+
+- Follow the existing component-based architecture patterns
+- Keep methods focused and single-purpose
+- Extract complex logic into well-named helper methods
+- Maintain consistency with existing code style and naming conventions
+
+### Communication
+
+- Be clear about what you're doing and why
+- Explain trade-offs when they exist
+- Ask questions when requirements are unclear
+- Confirm understanding of complex or unusual requests before implementing
+
 ## Project Overview
 
 This is a **Space Engineers Programmable Block Script** for automated farm management. The project uses the Malware Development Kit (MDK2) framework to develop, build, and deploy in-game scripts for Space Engineers.

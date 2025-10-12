@@ -236,7 +236,8 @@ namespace IngameScript
         /// </summary>
         private void DrawGraphicalUI()
         {
-            SpriteRenderer.DrawGraphicalUI(_lcdPanel, _farmGroup);
+            var renderer = new SpriteRenderer(_lcdPanel, _farmGroup);
+            renderer.DrawGraphicalUI();
         }
 
         /// <summary>
