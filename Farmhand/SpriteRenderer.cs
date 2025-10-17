@@ -21,25 +21,26 @@ namespace IngameScript
     internal class SpriteRenderer
     {
         // Layout constants
-        private const float SPACING = 10f;
         private const float PLOT_PADDING = 2f;
-        private const float WATER_INNER_PADDING = 2f;
         private const float ICON_SCALE = 0.8f;
+        private const float PLOT_SCALE = 0.8f;
         private const float HEADER_SCALE = 0.8f;
-        private const float HEADER_Y_POSITION = 10f;
-        private const float HEADER_FONT_HEIGHT = 24f;
 
         // Instance fields
         private readonly IMyTextSurface _surface;
         private readonly FarmGroup _farmGroup;
-        private readonly Vector2 _viewport;
+        private readonly RectangleF _viewport;
+        private readonly Vector2 _textureSize;
 
         // Derived layout values
+        private readonly float _spacing;
+        private readonly float _headerYPosition;
+        private readonly float _headerFontHeight;
         private readonly float _iconSize;
-        private readonly float _iconPadding;
         private readonly float _leftMargin;
-        private readonly float _waterRectHeight;
         private readonly float _rectHeight;
+        private readonly float _waterRectHeight;
+        private readonly float _growthRectHeight;
         private readonly float _rectWidth;
         private readonly int _plotsPerRow;
         private readonly int _halfScreenPlots;
@@ -53,23 +54,41 @@ namespace IngameScript
         {
             _surface = surface;
             _farmGroup = farmGroup;
-            _viewport = surface.SurfaceSize;
+            _textureSize = surface.TextureSize;
+            _viewport = new RectangleF(
+                (_textureSize - surface.SurfaceSize) / 2f,
+                surface.SurfaceSize
+            );
 
-            // Calculate derived layout values
-            _iconSize = _viewport.Y / 8f * ICON_SCALE;
-            _iconPadding = _iconSize / 2f;
-            _leftMargin = SPACING;
-            _waterRectHeight = _iconSize / 5f;
-            _rectHeight = _viewport.Y / 8f - _waterRectHeight - SPACING;
-            _rectWidth = _rectHeight * 0.75f;
+            // Initialize derived layout values
+            _spacing = _viewport.Width / 50f;
+            _headerFontHeight = _viewport.Height / 20f * HEADER_SCALE;
+            _headerYPosition = _headerFontHeight / 2f;
+            _iconSize = _viewport.Height / 8f * ICON_SCALE;
+            _leftMargin = _spacing;
+            _rectHeight = _viewport.Height / 8f * PLOT_SCALE;
+            _waterRectHeight = _rectHeight / 5f;
+            _growthRectHeight = _rectHeight * (4f / 5f);
+            _rectWidth = _growthRectHeight * 0.75f;
 
             // Calculate how many plots fit per row (accounting for icon)
-            float availableWidth = _viewport.X - _leftMargin - _iconSize - SPACING - SPACING;
-            _plotsPerRow = (int)((availableWidth + SPACING) / (_rectWidth + SPACING));
+            float availableWidth = _viewport.Width - _leftMargin - _iconSize - _spacing - _spacing;
+            _plotsPerRow = (int)((availableWidth + _spacing) / (_rectWidth + _spacing));
             if (_plotsPerRow < 1)
                 _plotsPerRow = 1;
 
             _halfScreenPlots = _plotsPerRow / 2 - 1;
+        }
+
+        /// <summary>
+        /// Creates a Vector2 position with viewport offset applied
+        /// </summary>
+        /// <param name="x">X coordinate relative to drawable surface</param>
+        /// <param name="y">Y coordinate relative to drawable surface</param>
+        /// <returns>Vector2 with viewport offset applied for proper centering</returns>
+        private Vector2 CreatePosition(float x, float y)
+        {
+            return new Vector2(x, y) + _viewport.Position;
         }
 
         /// <summary>
@@ -82,114 +101,114 @@ namespace IngameScript
             // _surface.ScriptBackgroundColor = Color.Black;
             // _surface.ScriptForegroundColor = Color.White;
 
-            var frame = _surface.DrawFrame();
-
-            // Draw header and footer
-            DrawHeader(frame);
-            DrawFooter(frame);
-
-            if (_farmGroup == null || _farmGroup.FarmPlots.Count == 0)
+            using (var frame = _surface.DrawFrame())
             {
-                frame.Dispose();
-                return;
-            }
+                // Draw header and footer
+                DrawHeader(frame);
+                DrawFooter(frame);
 
-            // Group plots by PlantType, ordered by group size (largest first), empty plots last
-            var allGroups = _farmGroup.FarmPlots.GroupBy(p => p.PlantType).ToList();
-
-            var nonEmptyGroups = allGroups
-                .Where(g => !string.IsNullOrEmpty(g.Key))
-                .OrderByDescending(g => g.Count())
-                .ToList();
-
-            var emptyGroups = allGroups.Where(g => string.IsNullOrEmpty(g.Key)).ToList();
-
-            var groupedPlots = nonEmptyGroups.Concat(emptyGroups).ToList();
-
-            // Pre-process groups into layout rows (pair small groups side-by-side)
-            var layoutRows = new List<LayoutRow>();
-            IGrouping<string, FarmPlot> pendingGroup = null;
-
-            foreach (var group in groupedPlots)
-            {
-                bool isSmallGroup = group.Count() <= _halfScreenPlots;
-
-                if (isSmallGroup)
+                if (_farmGroup == null || _farmGroup.FarmPlots.Count == 0)
                 {
-                    if (pendingGroup == null)
+                    frame.Dispose();
+                    return;
+                }
+
+                // Group plots by PlantType, ordered by group size (largest first), empty plots last
+                var allGroups = _farmGroup.FarmPlots.GroupBy(p => p.PlantType).ToList();
+
+                var nonEmptyGroups = allGroups
+                    .Where(g => !string.IsNullOrEmpty(g.Key))
+                    .OrderByDescending(g => g.Count())
+                    .ToList();
+
+                var emptyGroups = allGroups.Where(g => string.IsNullOrEmpty(g.Key)).ToList();
+
+                var groupedPlots = nonEmptyGroups.Concat(emptyGroups).ToList();
+
+                // Pre-process groups into layout rows (pair small groups side-by-side)
+                var layoutRows = new List<LayoutRow>();
+                IGrouping<string, FarmPlot> pendingGroup = null;
+
+                foreach (var group in groupedPlots)
+                {
+                    bool isSmallGroup = group.Count() <= _halfScreenPlots;
+
+                    if (isSmallGroup)
                     {
-                        // Save this small group as pending
-                        pendingGroup = group;
+                        if (pendingGroup == null)
+                        {
+                            // Save this small group as pending
+                            pendingGroup = group;
+                        }
+                        else
+                        {
+                            // Pair with pending group
+                            layoutRows.Add(
+                                new LayoutRow { LeftGroup = pendingGroup, RightGroup = group }
+                            );
+                            pendingGroup = null;
+                        }
                     }
                     else
                     {
-                        // Pair with pending group
-                        layoutRows.Add(
-                            new LayoutRow { LeftGroup = pendingGroup, RightGroup = group }
+                        // Large group gets its own row
+                        if (pendingGroup != null)
+                        {
+                            // Flush pending group first
+                            layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
+                            pendingGroup = null;
+                        }
+                        layoutRows.Add(new LayoutRow { LeftGroup = group });
+                    }
+                }
+
+                // Flush any remaining pending group
+                if (pendingGroup != null)
+                {
+                    layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
+                }
+
+                // Start just below the header (header is at y=10 with scale 0.8)
+                float headerHeight = HEADER_SCALE * _headerFontHeight; // Approximate font height with scale
+                float currentY = _rectHeight / 2f + headerHeight + _spacing * 2f;
+
+                // Draw each layout row
+                foreach (var layoutRow in layoutRows)
+                {
+                    int maxRowsInThisLayoutRow = 0;
+
+                    // Process left column (always present)
+                    if (layoutRow.LeftGroup != null)
+                    {
+                        int rowsInLeftGroup = DrawColumn(
+                            frame,
+                            layoutRow.LeftGroup,
+                            _leftMargin,
+                            currentY
                         );
-                        pendingGroup = null;
+                        maxRowsInThisLayoutRow = rowsInLeftGroup;
                     }
-                }
-                else
-                {
-                    // Large group gets its own row
-                    if (pendingGroup != null)
+
+                    // Process right column (if present)
+                    if (layoutRow.RightGroup != null)
                     {
-                        // Flush pending group first
-                        layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
-                        pendingGroup = null;
+                        int rowsInRightGroup = DrawColumn(
+                            frame,
+                            layoutRow.RightGroup,
+                            _viewport.Width / 2f + _leftMargin,
+                            currentY
+                        );
+                        if (rowsInRightGroup > maxRowsInThisLayoutRow)
+                        {
+                            maxRowsInThisLayoutRow = rowsInRightGroup;
+                        }
                     }
-                    layoutRows.Add(new LayoutRow { LeftGroup = group });
+
+                    // Move to next layout row (based on tallest group in this row)
+                    currentY +=
+                        maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2f) + _spacing;
                 }
             }
-
-            // Flush any remaining pending group
-            if (pendingGroup != null)
-            {
-                layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
-            }
-
-            // Start just below the header (header is at y=10 with scale 0.8)
-            float headerHeight = HEADER_SCALE * HEADER_FONT_HEIGHT; // Approximate font height with scale
-            float currentY = 10f + headerHeight + SPACING * 3f;
-
-            // Draw each layout row
-            foreach (var layoutRow in layoutRows)
-            {
-                int maxRowsInThisLayoutRow = 0;
-
-                // Process left column (always present)
-                if (layoutRow.LeftGroup != null)
-                {
-                    int rowsInLeftGroup = DrawColumn(
-                        frame,
-                        layoutRow.LeftGroup,
-                        _leftMargin,
-                        currentY
-                    );
-                    maxRowsInThisLayoutRow = rowsInLeftGroup;
-                }
-
-                // Process right column (if present)
-                if (layoutRow.RightGroup != null)
-                {
-                    int rowsInRightGroup = DrawColumn(
-                        frame,
-                        layoutRow.RightGroup,
-                        _viewport.X / 2f + _leftMargin,
-                        currentY
-                    );
-                    if (rowsInRightGroup > maxRowsInThisLayoutRow)
-                    {
-                        maxRowsInThisLayoutRow = rowsInRightGroup;
-                    }
-                }
-
-                // Move to next layout row (based on tallest group in this row)
-                currentY += maxRowsInThisLayoutRow * (_rectHeight + SPACING * 2f) + SPACING;
-            }
-
-            frame.Dispose();
         }
 
         /// <summary>
@@ -260,9 +279,9 @@ namespace IngameScript
                 int col = i % _plotsPerRow;
 
                 // Calculate position (offset by icon)
-                float plotStartX = columnStartX + (_iconSize + _iconPadding * 2f) / 2f;
-                float x = plotStartX + col * (_rectWidth + SPACING) + _rectWidth / 2f;
-                float y = currentY + row * (_rectHeight + SPACING * 2f);
+                float plotStartX = columnStartX + _iconSize + _spacing;
+                float x = plotStartX + col * (_rectWidth + _spacing) + _rectWidth / 2f;
+                float y = currentY + row * (_rectHeight + _spacing * 2f);
 
                 // Get growth progress and determine color
                 float growthProgress = 0f;
@@ -295,33 +314,13 @@ namespace IngameScript
             {
                 Type = SpriteType.TEXT,
                 Data = headerText,
-                Position = new Vector2(_viewport.X / 2f, HEADER_Y_POSITION),
+                Position = CreatePosition(_viewport.Width / 2f, _headerYPosition),
                 RotationOrScale = HEADER_SCALE,
                 Color = _surface.ScriptForegroundColor,
                 Alignment = TextAlignment.CENTER,
                 FontId = "White",
             };
             frame.Add(header);
-        }
-
-        /// <summary>
-        /// Draws the footer sprite with dimensions at the bottom of the screen
-        /// </summary>
-        /// <param name="frame">The sprite frame to add the footer to</param>
-        private void DrawFooter(MySpriteDrawFrame frame)
-        {
-            string dimensionsText = $"{(int)_viewport.Y} x {(int)_viewport.X}";
-            var dimensions = new MySprite()
-            {
-                Type = SpriteType.TEXT,
-                Data = dimensionsText,
-                Position = new Vector2(_viewport.X / 2f, _viewport.Y - HEADER_Y_POSITION * 2f),
-                RotationOrScale = HEADER_SCALE,
-                Color = _surface.ScriptForegroundColor,
-                Alignment = TextAlignment.CENTER,
-                FontId = "White",
-            };
-            frame.Add(dimensions);
         }
 
         /// <summary>
@@ -340,14 +339,14 @@ namespace IngameScript
         {
             if (plots.Count > 0 && plots[0].IsPlantPlanted)
             {
-                float iconX = columnStartX + _iconPadding;
+                float iconX = columnStartX + (_iconSize / 2f);
                 float iconY = currentY;
 
                 var groupIcon = new MySprite()
                 {
                     Type = SpriteType.TEXTURE,
                     Data = plots[0].PlantId,
-                    Position = new Vector2(iconX, iconY),
+                    Position = CreatePosition(iconX, iconY),
                     Size = new Vector2(_iconSize, _iconSize),
                     Alignment = TextAlignment.CENTER,
                 };
@@ -373,12 +372,14 @@ namespace IngameScript
             Color outlineColor
         )
         {
+            var growthYOffet = (_waterRectHeight + PLOT_PADDING / 2f) / 2f;
+
             // Draw outline rectangle with state-based color
             var outline = new MySprite()
             {
                 Type = SpriteType.TEXTURE,
                 Data = "SquareSimple",
-                Position = new Vector2(x, y),
+                Position = CreatePosition(x, y),
                 Size = new Vector2(_rectWidth, _rectHeight),
                 Color = outlineColor,
                 Alignment = TextAlignment.CENTER,
@@ -386,31 +387,33 @@ namespace IngameScript
             frame.Add(outline);
 
             // Draw black background (creates padding inside border)
-            float padding = PLOT_PADDING * 2f;
+            float padding = PLOT_PADDING;
             var background = new MySprite()
             {
                 Type = SpriteType.TEXTURE,
                 Data = "SquareSimple",
-                Position = new Vector2(x, y),
-                Size = new Vector2(_rectWidth - padding, _rectHeight - padding),
-                Color = _surface.ScriptBackgroundColor,
+                Position = CreatePosition(x, y - growthYOffet),
+                Size = new Vector2(_rectWidth - padding, _growthRectHeight - padding),
+                // Color = _surface.ScriptBackgroundColor,
+                Color = Color.DimGray,
                 Alignment = TextAlignment.CENTER,
             };
             frame.Add(background);
 
+            float innerPadding = PLOT_PADDING * 4f;
+
             // Draw filled rectangle based on growth
             if (growthProgress > 0f)
             {
-                float innerPadding = PLOT_PADDING * 4f;
-                float plotAvailableHeight = _rectHeight - innerPadding;
+                float plotAvailableHeight = _growthRectHeight - innerPadding;
                 float filledHeight = plotAvailableHeight * growthProgress;
-                float filledY = y + (_rectHeight - filledHeight - innerPadding) / 2f;
+                float filledY = y + (_growthRectHeight - filledHeight - innerPadding) / 2f;
 
                 var filled = new MySprite()
                 {
                     Type = SpriteType.TEXTURE,
                     Data = "SquareSimple",
-                    Position = new Vector2(x, filledY),
+                    Position = CreatePosition(x, filledY - growthYOffet),
                     Size = new Vector2(_rectWidth - innerPadding, filledHeight),
                     Color = outlineColor,
                     Alignment = TextAlignment.CENTER,
@@ -419,28 +422,17 @@ namespace IngameScript
             }
 
             // Draw water level indicator below the farm plot
-            float waterRectY = y + (_rectHeight / 2f) + _waterRectHeight - SPACING;
-
-            // Water level outline (same color as farm plot)
-            var waterOutline = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = new Vector2(x, waterRectY),
-                Size = new Vector2(_rectWidth, _waterRectHeight),
-                Color = outlineColor,
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(waterOutline);
+            float waterRectY = y + (_rectHeight / 2f) - (_waterRectHeight + padding) / 2f;
 
             // Water level background (black)
             var waterBackground = new MySprite()
             {
                 Type = SpriteType.TEXTURE,
                 Data = "SquareSimple",
-                Position = new Vector2(x, waterRectY),
+                Position = CreatePosition(x, waterRectY),
                 Size = new Vector2(_rectWidth - padding, _waterRectHeight - padding),
-                Color = Color.Black,
+                // Color = _surface.ScriptBackgroundColor,
+                Color = Color.DimGray,
                 Alignment = TextAlignment.CENTER,
             };
             frame.Add(waterBackground);
@@ -449,8 +441,7 @@ namespace IngameScript
             float waterRatio = (float)plot.WaterFilledRatio;
             if (waterRatio > 0f)
             {
-                float waterInnerPadding = padding + WATER_INNER_PADDING;
-                float waterAvailableWidth = _rectWidth - waterInnerPadding;
+                float waterAvailableWidth = _rectWidth - innerPadding;
                 float filledWidth = waterAvailableWidth * waterRatio;
                 float waterFilledX = x - (waterAvailableWidth / 2f) + (filledWidth / 2f);
 
@@ -458,9 +449,9 @@ namespace IngameScript
                 {
                     Type = SpriteType.TEXTURE,
                     Data = "SquareSimple",
-                    Position = new Vector2(waterFilledX, waterRectY),
-                    Size = new Vector2(filledWidth, _waterRectHeight - waterInnerPadding),
-                    Color = Color.Blue,
+                    Position = CreatePosition(waterFilledX, waterRectY),
+                    Size = new Vector2(filledWidth, _waterRectHeight - innerPadding),
+                    Color = outlineColor,
                     Alignment = TextAlignment.CENTER,
                 };
                 frame.Add(waterFilled);
@@ -483,6 +474,29 @@ namespace IngameScript
             return doubleSided
                 ? $"{animationStart[runNumber % animationEnd.Length]} {title} {animationEnd[runNumber % animationEnd.Length]}"
                 : $"{title} {animationEnd[runNumber % animationEnd.Length]}";
+        }
+
+        /// <summary>
+        /// Draws the footer sprite with dimensions at the bottom of the screen
+        /// </summary>
+        /// <param name="frame">The sprite frame to add the footer to</param>
+        private void DrawFooter(MySpriteDrawFrame frame)
+        {
+            string dimensionsText = $"{(int)_viewport.Width} x {(int)_viewport.Height}";
+            var dimensions = new MySprite()
+            {
+                Type = SpriteType.TEXT,
+                Data = dimensionsText,
+                Position = CreatePosition(
+                    _viewport.Width / 2f,
+                    _viewport.Height - _headerYPosition * 2f
+                ),
+                RotationOrScale = HEADER_SCALE,
+                Color = _surface.ScriptForegroundColor,
+                Alignment = TextAlignment.CENTER,
+                FontId = "White",
+            };
+            frame.Add(dimensions);
         }
     }
 }
