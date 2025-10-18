@@ -54,7 +54,7 @@ namespace IngameScript
 
             Echo($"Instructions: {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
             Echo(
-                $"Quota: {(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2}"
+                $"Quota: {(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2}"
             );
             Echo($"Active Coroutines: {activeCoroutines.Count}");
             Echo($"Last Cycle Time: {lastCycleTime / 1000:F2}s");

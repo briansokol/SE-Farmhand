@@ -76,8 +76,8 @@ namespace IngameScript
                 "TextAlignment",
                 new CustomDataConfig(
                     "Text Alignment",
-                    "Left",
-                    "Text alignment on screen (Left or Center)"
+                    "left",
+                    "Text alignment on screen (left or center)"
                 )
             },
         };
@@ -219,9 +219,9 @@ namespace IngameScript
                 ParseCustomData();
                 string alignment = _customData
                     .Get(_customDataHeader, _customDataConfigs["TextAlignment"].Label)
-                    .ToString("Left");
+                    .ToString("left");
 
-                if (alignment.Equals("Center", System.StringComparison.OrdinalIgnoreCase))
+                if (alignment.Equals("center", System.StringComparison.OrdinalIgnoreCase))
                 {
                     return TextAlignment.CENTER;
                 }
