@@ -64,6 +64,14 @@ namespace IngameScript
                     "Shows current crop yield (set index of screen, false to hide)"
                 )
             },
+            {
+                "TextAlignment",
+                new CustomDataConfig(
+                    "Text Alignment",
+                    "Left",
+                    "Text alignment on screen (Left or Center)"
+                )
+            },
         };
 
         public override IMyTerminalBlock BlockInstance => _cockpit;
@@ -103,16 +111,24 @@ namespace IngameScript
         /// </summary>
         /// <param name="text">Text to display</param>
         /// <param name="category">The category of the text</param>
-        public void AppendText(string text, string category = null)
+        /// <param name="isHeader">Whether this text is a header (headers are not indented)</param>
+        public void AppendText(string text, string category = null, bool isHeader = false)
         {
             if (IsFunctional() && _cockpit != null)
             {
+                // Add 2-space indentation for non-headers when left-aligned
+                string outputText = text;
+                if (!isHeader && GetTextAlignment() == TextAlignment.LEFT)
+                {
+                    outputText = "  " + text;
+                }
+
                 if (category == null || (category == "Header" && ShouldShowHeader()))
                 {
                     var activeScreens = GetActiveScreens();
                     activeScreens.ForEach(index =>
                     {
-                        _lcdOutput[index].AppendLine(text);
+                        _lcdOutput[index].AppendLine(outputText);
                     });
                 }
                 else
@@ -120,7 +136,7 @@ namespace IngameScript
                     var screenIndex = GetScreenForCategory(category);
                     if (screenIndex >= 0)
                     {
-                        _lcdOutput[screenIndex].AppendLine(text);
+                        _lcdOutput[screenIndex].AppendLine(outputText);
                     }
                 }
             }
@@ -137,9 +153,36 @@ namespace IngameScript
                 {
                     var screen = _cockpit.GetSurface(index);
                     screen.ContentType = ContentType.TEXT_AND_IMAGE;
+                    screen.Alignment = GetTextAlignment();
                     screen.WriteText(_lcdOutput[index].ToString(), false);
                     _lcdOutput[index].Clear();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Gets the configured text alignment from custom data
+        /// </summary>
+        /// <returns>The text alignment setting (defaults to LEFT)</returns>
+        private TextAlignment GetTextAlignment()
+        {
+            try
+            {
+                ParseCustomData();
+                string alignment = _customData
+                    .Get(_customDataHeader, _customDataConfigs["TextAlignment"].Label)
+                    .ToString("Left");
+
+                if (alignment.Equals("Center", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return TextAlignment.CENTER;
+                }
+
+                return TextAlignment.LEFT;
+            }
+            catch
+            {
+                return TextAlignment.LEFT;
             }
         }
 

@@ -47,6 +47,14 @@ namespace IngameScript
                 new CustomDataConfig("Show Irrigation", "true", "Shows irrigation system status")
             },
             { "ShowYield", new CustomDataConfig("Show Yield", "true", "Shows current crop yield") },
+            {
+                "TextAlignment",
+                new CustomDataConfig(
+                    "Text Alignment",
+                    "Left",
+                    "Text alignment on screen (Left or Center)"
+                )
+            },
         };
 
         public override IMyTerminalBlock BlockInstance => _lcdPanel;
@@ -82,13 +90,20 @@ namespace IngameScript
         /// </summary>
         /// <param name="text">Text to display</param>
         /// <param name="category">The category of the text</param>
-        public void AppendText(string text, string category = null)
+        /// <param name="isHeader">Whether this text is a header (headers are not indented)</param>
+        public void AppendText(string text, string category = null, bool isHeader = false)
         {
             if (IsFunctional() && _lcdPanel != null)
             {
                 if (category == null || IsCategoryVisible(category))
                 {
-                    _lcdOutput.AppendLine(text);
+                    // Add 2-space indentation for non-headers when left-aligned
+                    string outputText = text;
+                    if (!isHeader && GetTextAlignment() == TextAlignment.LEFT)
+                    {
+                        outputText = "  " + text;
+                    }
+                    _lcdOutput.AppendLine(outputText);
                 }
             }
         }
@@ -101,8 +116,35 @@ namespace IngameScript
             if (IsFunctional() && _lcdPanel != null)
             {
                 _lcdPanel.ContentType = ContentType.TEXT_AND_IMAGE;
+                _lcdPanel.Alignment = GetTextAlignment();
                 _lcdPanel.WriteText(_lcdOutput.ToString(), false);
                 _lcdOutput.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Gets the configured text alignment from custom data
+        /// </summary>
+        /// <returns>The text alignment setting (defaults to LEFT)</returns>
+        private TextAlignment GetTextAlignment()
+        {
+            try
+            {
+                ParseCustomData();
+                string alignment = _customData
+                    .Get(_customDataHeader, _customDataConfigs["TextAlignment"].Label)
+                    .ToString("Left");
+
+                if (alignment.Equals("Center", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return TextAlignment.CENTER;
+                }
+
+                return TextAlignment.LEFT;
+            }
+            catch
+            {
+                return TextAlignment.LEFT;
             }
         }
 

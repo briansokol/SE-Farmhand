@@ -54,7 +54,7 @@ namespace IngameScript
 
             Echo($"Instructions: {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
             Echo(
-                $"Quota: {(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2}"
+                $"Quota: {(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2}"
             );
             Echo($"Active Coroutines: {activeCoroutines.Count}");
             Echo($"Last Cycle Time: {lastCycleTime / 1000:F2}s");
@@ -185,8 +185,8 @@ namespace IngameScript
                 .GetAllGroups()
                 .ForEach(farmGroup =>
                 {
-                    WriteToMainOutput(farmGroup.GroupName, header, "Header");
-                    WriteToMainOutput(farmGroup.GroupName, "", "Header");
+                    WriteToMainOutput(farmGroup.GroupName, header, "Header", isHeader: true);
+                    WriteToMainOutput(farmGroup.GroupName, "", "Header", isHeader: true);
                 });
 
             yield return true;
@@ -323,7 +323,7 @@ namespace IngameScript
                                 if (plotDetails.CropHealth < thisPb.HealthLowThreshold)
                                 {
                                     alertMessages.Add(
-                                        $"  Health Low: {plotDetails.CropHealth:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
+                                        $"Health Low: {plotDetails.CropHealth:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
                                     );
                                     dyingPlants++;
                                 }
@@ -383,7 +383,7 @@ namespace IngameScript
                             farmPlot.LightBlinkInterval = 1f;
                             farmPlot.LightBlinkLength = 50f;
                             alertMessages.Add(
-                                $"  Water Low: {farmPlot.WaterFilledRatio:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
+                                $"Water Low: {farmPlot.WaterFilledRatio:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
                             );
                             farmPlotsLowOnWater++;
                         }
@@ -406,7 +406,7 @@ namespace IngameScript
                         {
                             case VentStatus.Pressurizing:
                             case VentStatus.Pressurized:
-                                atmosphereMessages.Add($"  Pressurized: {vent.OxygenLevel:P0}");
+                                atmosphereMessages.Add($"Pressurized: {vent.OxygenLevel:P0}");
                                 farmGroup.StateManager.UpdateState("OnPressurized", true);
                                 break;
                             case VentStatus.Depressurizing:
@@ -414,14 +414,12 @@ namespace IngameScript
                                 if (vent.CanPressurize)
                                 {
                                     atmosphereMessages.Add(
-                                        $"  Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}"
+                                        $"Depressurized (Room is Air Tight): {vent.OxygenLevel:P0}"
                                     );
                                 }
                                 else
                                 {
-                                    atmosphereMessages.Add(
-                                        $"  Depressurized: {vent.OxygenLevel:P0}"
-                                    );
+                                    atmosphereMessages.Add($"Depressurized: {vent.OxygenLevel:P0}");
                                 }
                                 farmGroup.StateManager.UpdateState("OnPressurized", false);
                                 break;
@@ -442,7 +440,7 @@ namespace IngameScript
 
                         var iceLowThreshold = thisPb.IceLowThreshold;
                         var iceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
-                        irrigationMessages.Add($"  Ice: {iceRatio:P0}");
+                        irrigationMessages.Add($"Ice: {iceRatio:P0}");
 
                         farmGroup.StateManager.UpdateState("OnIceLow", iceRatio < iceLowThreshold);
                     }
@@ -451,26 +449,26 @@ namespace IngameScript
                     if (deadPlants > 0)
                     {
                         farmPlotMessages.Add(
-                            $"  Dead Plants: {deadPlants} ({string.Join(", ", causesOfDeath.Distinct())})"
+                            $"Dead Plants: {deadPlants} ({string.Join(", ", causesOfDeath.Distinct())})"
                         );
                     }
                     farmGroup.StateManager.UpdateState("OnCropDead", deadPlants > 0);
 
                     if (seedsNeeded > 0)
                     {
-                        farmPlotMessages.Add($"  Available Plots: {seedsNeeded}");
+                        farmPlotMessages.Add($"Available Plots: {seedsNeeded}");
                     }
                     farmGroup.StateManager.UpdateState("OnCropAvailable", seedsNeeded > 0);
 
                     if (farmPlotsReadyToHarvest > 0)
                     {
-                        farmPlotMessages.Add($"  Harvest Ready Plots: {farmPlotsReadyToHarvest}");
+                        farmPlotMessages.Add($"Harvest Ready Plots: {farmPlotsReadyToHarvest}");
                     }
                     farmGroup.StateManager.UpdateState("OnCropReady", farmPlotsReadyToHarvest > 0);
 
                     if (waterUsagePerMinute > 0f)
                     {
-                        farmPlotMessages.Add($"  Water Usage: {waterUsagePerMinute:F1} L/min");
+                        farmPlotMessages.Add($"Water Usage: {waterUsagePerMinute:F1} L/min");
                     }
 
                     // Check if all planted crops are ready to harvest
@@ -511,7 +509,7 @@ namespace IngameScript
                             }
 
                             yieldMessages.Add(
-                                $"  {entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {string.Join(", ", yieldText)}"
+                                $"{entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {string.Join(", ", yieldText)}"
                             );
                         }
                     }
@@ -519,7 +517,7 @@ namespace IngameScript
 
                 if (alertMessages.Count > 0)
                 {
-                    WriteToMainOutput(groupName, "Alerts", "ShowAlerts");
+                    WriteToMainOutput(groupName, "Alerts", "ShowAlerts", isHeader: true);
                     alertMessages.ForEach(message =>
                         WriteToMainOutput(groupName, message, "ShowAlerts")
                     );
@@ -528,7 +526,7 @@ namespace IngameScript
 
                 if (farmPlotMessages.Count > 0)
                 {
-                    WriteToMainOutput(groupName, "Farm Plots", "ShowFarmPlots");
+                    WriteToMainOutput(groupName, "Farm Plots", "ShowFarmPlots", isHeader: true);
                     farmPlotMessages.ForEach(message =>
                         WriteToMainOutput(groupName, message, "ShowFarmPlots")
                     );
@@ -537,7 +535,7 @@ namespace IngameScript
 
                 if (atmosphereMessages.Count > 0)
                 {
-                    WriteToMainOutput(groupName, "Atmosphere", "ShowAtmosphere");
+                    WriteToMainOutput(groupName, "Atmosphere", "ShowAtmosphere", isHeader: true);
                     atmosphereMessages.ForEach(message =>
                         WriteToMainOutput(groupName, message, "ShowAtmosphere")
                     );
@@ -546,7 +544,7 @@ namespace IngameScript
 
                 if (irrigationMessages.Count > 0)
                 {
-                    WriteToMainOutput(groupName, "Irrigation", "ShowIrrigation");
+                    WriteToMainOutput(groupName, "Irrigation", "ShowIrrigation", isHeader: true);
                     irrigationMessages.ForEach(message =>
                         WriteToMainOutput(groupName, message, "ShowIrrigation")
                     );
@@ -555,7 +553,7 @@ namespace IngameScript
 
                 if (yieldMessages.Count > 0)
                 {
-                    WriteToMainOutput(groupName, "Current Yield", "ShowYield");
+                    WriteToMainOutput(groupName, "Current Yield", "ShowYield", isHeader: true);
                     yieldMessages.ForEach(message =>
                         WriteToMainOutput(groupName, message, "ShowYield")
                     );
@@ -595,18 +593,24 @@ namespace IngameScript
         /// <param name="groupName">Name of the farm group to write to</param>
         /// <param name="text">Text content to display</param>
         /// <param name="category">Optional category for filtering display</param>
-        void WriteToMainOutput(string groupName, string text, string category = null)
+        /// <param name="isHeader">Whether this text is a header (headers are not indented)</param>
+        void WriteToMainOutput(
+            string groupName,
+            string text,
+            string category = null,
+            bool isHeader = false
+        )
         {
             var group = farmGroups.GetGroup(groupName);
 
             group.LcdPanels.ForEach(panel =>
             {
-                panel.AppendText(text, category);
+                panel.AppendText(text, category, isHeader);
             });
 
             group.Cockpits.ForEach(cockpit =>
             {
-                cockpit.AppendText(text, category);
+                cockpit.AppendText(text, category, isHeader);
             });
         }
 
