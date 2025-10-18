@@ -15,8 +15,8 @@ namespace IngameScript
 
         readonly string lcdTag = "FarmLCD";
         int runNumber = 0;
-        readonly string Version = "v0.7.0";
-        readonly string PublishedDate = "2025-09-30";
+        readonly string Version = "v0.8.0";
+        readonly string PublishedDate = "2025-10-17";
 
         // Coroutine management
         readonly List<IEnumerator<bool>> activeCoroutines = new List<IEnumerator<bool>>();
@@ -179,13 +179,17 @@ namespace IngameScript
         /// </summary>
         IEnumerator<bool> PrintHeaderCoroutine()
         {
-            var header = GetHeaderAnimation(runNumber);
-
             farmGroups
                 .GetAllGroups()
                 .ForEach(farmGroup =>
                 {
-                    WriteToMainOutput(farmGroup.GroupName, header, "Header", isHeader: true);
+                    WriteToMainOutput(
+                        farmGroup.GroupName,
+                        "Farmhand",
+                        "Header",
+                        isHeader: true,
+                        runNumber: runNumber
+                    );
                     WriteToMainOutput(farmGroup.GroupName, "", "Header", isHeader: true);
                 });
 
@@ -440,7 +444,11 @@ namespace IngameScript
 
                         var iceLowThreshold = thisPb.IceLowThreshold;
                         var iceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
-                        irrigationMessages.Add($"Ice: {iceRatio:P0}");
+                        var currentIceKg = iceVolume / 0.37f;
+                        var maxIceKg = inventoryVolume / 0.37f;
+                        irrigationMessages.Add(
+                            $"Ice: {iceRatio:P0} ({currentIceKg:F1} kg / {maxIceKg:F1} kg)"
+                        );
 
                         farmGroup.StateManager.UpdateState("OnIceLow", iceRatio < iceLowThreshold);
                     }
@@ -594,23 +602,25 @@ namespace IngameScript
         /// <param name="text">Text content to display</param>
         /// <param name="category">Optional category for filtering display</param>
         /// <param name="isHeader">Whether this text is a header (headers are not indented)</param>
+        /// <param name="runNumber">Animation frame number for animated header (0-2)</param>
         void WriteToMainOutput(
             string groupName,
             string text,
             string category = null,
-            bool isHeader = false
+            bool isHeader = false,
+            int runNumber = 0
         )
         {
             var group = farmGroups.GetGroup(groupName);
 
             group.LcdPanels.ForEach(panel =>
             {
-                panel.AppendText(text, category, isHeader);
+                panel.AppendText(text, category, isHeader, runNumber);
             });
 
             group.Cockpits.ForEach(cockpit =>
             {
-                cockpit.AppendText(text, category, isHeader);
+                cockpit.AppendText(text, category, isHeader, runNumber);
             });
         }
 

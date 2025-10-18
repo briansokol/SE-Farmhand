@@ -33,6 +33,14 @@ namespace IngameScript
                 new CustomDataConfig("Header", "true", "Shows the animated header on each screen")
             },
             {
+                "Title",
+                new CustomDataConfig(
+                    "Title",
+                    "",
+                    "Optional custom title text displayed below the header"
+                )
+            },
+            {
                 "ShowAlerts",
                 new CustomDataConfig(
                     "Show Alerts",
@@ -107,23 +115,63 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Gets the custom title text from custom data
+        /// </summary>
+        /// <returns>The title text, or empty string if not set</returns>
+        private string GetTitle()
+        {
+            ParseCustomData();
+            return _customData
+                .Get(_customDataHeader, _customDataConfigs["Title"].Label)
+                .ToString("");
+        }
+
+        /// <summary>
         /// Writes text to the internal buffer if the category is set to be visible
         /// </summary>
         /// <param name="text">Text to display</param>
         /// <param name="category">The category of the text</param>
         /// <param name="isHeader">Whether this text is a header (headers are not indented)</param>
-        public void AppendText(string text, string category = null, bool isHeader = false)
+        /// <param name="runNumber">Animation frame number for animated header (0-2)</param>
+        public void AppendText(
+            string text,
+            string category = null,
+            bool isHeader = false,
+            int runNumber = 0
+        )
         {
             if (IsFunctional() && _cockpit != null)
             {
-                // Add 2-space indentation for non-headers when left-aligned
                 string outputText = text;
-                if (!isHeader && GetTextAlignment() == TextAlignment.LEFT)
+
+                // Handle Title category - get title from custom data
+                if (category == "Title")
+                {
+                    outputText = GetTitle();
+                    // If title is empty, don't write anything (not even a blank line)
+                    if (string.IsNullOrEmpty(outputText))
+                    {
+                        return;
+                    }
+                }
+                // Apply header animation if this is the animated header
+                else if (category == "Header" && isHeader && !string.IsNullOrEmpty(text))
+                {
+                    var customTitle = GetTitle();
+                    var headerTitle = string.IsNullOrEmpty(customTitle) ? text : customTitle;
+                    outputText = GetHeaderAnimation(runNumber, headerTitle);
+                }
+                // Add 2-space indentation for non-headers when left-aligned
+                else if (!isHeader && GetTextAlignment() == TextAlignment.LEFT)
                 {
                     outputText = "  " + text;
                 }
 
-                if (category == null || (category == "Header" && ShouldShowHeader()))
+                if (
+                    category == null
+                    || (category == "Header" && ShouldShowHeader())
+                    || category == "Title"
+                )
                 {
                     var activeScreens = GetActiveScreens();
                     activeScreens.ForEach(index =>
@@ -240,6 +288,48 @@ namespace IngameScript
             return _customData
                 .Get(_customDataHeader, _customDataConfigs["Header"].Label)
                 .ToBoolean(false);
+        }
+
+        /// <summary>
+        /// Generates the animated header text based on text alignment and animation frame
+        /// </summary>
+        /// <param name="runNumber">Animation frame number (0-2)</param>
+        /// <param name="title">The title text to display in the header (defaults to "Farmhand")</param>
+        /// <returns>Formatted header string with animation</returns>
+        private string GetHeaderAnimation(int runNumber, string title = "Farmhand")
+        {
+            var alignment = GetTextAlignment();
+
+            if (alignment == TextAlignment.CENTER)
+            {
+                // Center alignment: animated dots/dashes on both sides
+                switch (runNumber)
+                {
+                    case 0:
+                        return $"––• {title} •––";
+                    case 1:
+                        return $"–•– {title} –•–";
+                    case 2:
+                        return $"•–– {title} ––•";
+                    default:
+                        return title;
+                }
+            }
+            else
+            {
+                // Left alignment: animated dots/dashes on right side only
+                switch (runNumber)
+                {
+                    case 0:
+                        return $"{title} •––";
+                    case 1:
+                        return $"{title} –•–";
+                    case 2:
+                        return $"{title} ––•";
+                    default:
+                        return title;
+                }
+            }
         }
 
         /// <summary>
