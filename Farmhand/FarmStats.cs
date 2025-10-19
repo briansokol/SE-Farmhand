@@ -83,6 +83,16 @@ namespace IngameScript
         public float IceRatio { get; set; }
 
         /// <summary>
+        /// Current mass of ice in kilograms
+        /// </summary>
+        public float CurrentIceKg { get; set; }
+
+        /// <summary>
+        /// Max mass of ice in kilograms
+        /// </summary>
+        public float MaxIceKg { get; set; }
+
+        /// <summary>
         /// List of alert messages requiring attention
         /// </summary>
         public List<string> AlertMessages { get; set; }

@@ -145,30 +145,30 @@ namespace IngameScript
                     WriteToDiagnosticOutput($"Group: {farmGroup.GroupName}");
                     if (farmGroup.FarmPlots.Count > 0)
                     {
-                        WriteToDiagnosticOutput($"  Farm Plots: {farmGroup.FarmPlots.Count}");
+                        WriteToDiagnosticOutput($"Farm Plots: {farmGroup.FarmPlots.Count}");
                     }
                     if (farmGroup.IrrigationSystems.Count > 0)
                     {
                         WriteToDiagnosticOutput(
-                            $"  Irrigation Systems: {farmGroup.IrrigationSystems.Count}"
+                            $"Irrigation Systems: {farmGroup.IrrigationSystems.Count}"
                         );
                     }
                     if (farmGroup.LcdPanels.Count > 0)
                     {
-                        WriteToDiagnosticOutput($"  LCD Panels: {farmGroup.LcdPanels.Count}");
+                        WriteToDiagnosticOutput($"LCD Panels: {farmGroup.LcdPanels.Count}");
                     }
                     if (farmGroup.Cockpits.Count > 0)
                     {
-                        WriteToDiagnosticOutput($"  Control Seats: {farmGroup.Cockpits.Count}");
+                        WriteToDiagnosticOutput($"Control Seats: {farmGroup.Cockpits.Count}");
                     }
                     if (farmGroup.AirVents.Count > 0)
                     {
-                        WriteToDiagnosticOutput($"  Air Vents: {farmGroup.AirVents.Count}");
+                        WriteToDiagnosticOutput($"Air Vents: {farmGroup.AirVents.Count}");
                     }
                     if (farmGroup.StateManager.RegisteredTimerCount > 0)
                     {
                         WriteToDiagnosticOutput(
-                            $"  Timers: {farmGroup.StateManager.RegisteredTimerCount}"
+                            $"Timers: {farmGroup.StateManager.RegisteredTimerCount}"
                         );
                     }
                 });
@@ -438,12 +438,8 @@ namespace IngameScript
 
                         var iceLowThreshold = thisPb.IceLowThreshold;
                         stats.IceRatio = inventoryVolume > 0 ? iceVolume / inventoryVolume : 0f;
-                        var currentIceKg = iceVolume / 0.37f;
-                        var maxIceKg = inventoryVolume / 0.37f;
-
-                        // irrigationMessages.Add(
-                        //     $"Ice: {iceRatio:P0} ({currentIceKg:F1} kg / {maxIceKg:F1} kg)"
-                        // );
+                        stats.CurrentIceKg = iceVolume / 0.37f;
+                        stats.MaxIceKg = inventoryVolume / 0.37f;
 
                         farmGroup.StateManager.UpdateState(
                             "OnIceLow",
@@ -487,23 +483,23 @@ namespace IngameScript
                 if (stats.DeadPlants > 0)
                 {
                     farmPlotMessages.Add(
-                        $"  Dead Plants: {stats.DeadPlants} ({string.Join(", ", stats.CausesOfDeath.Distinct())})"
+                        $"Dead Plants: {stats.DeadPlants} ({string.Join(", ", stats.CausesOfDeath.Distinct())})"
                     );
                 }
 
                 if (stats.SeedsNeeded > 0)
                 {
-                    farmPlotMessages.Add($"  Available Plots: {stats.SeedsNeeded}");
+                    farmPlotMessages.Add($"Available Plots: {stats.SeedsNeeded}");
                 }
 
                 if (stats.FarmPlotsReadyToHarvest > 0)
                 {
-                    farmPlotMessages.Add($"  Harvest Ready Plots: {stats.FarmPlotsReadyToHarvest}");
+                    farmPlotMessages.Add($"Harvest Ready Plots: {stats.FarmPlotsReadyToHarvest}");
                 }
 
                 if (stats.WaterUsagePerMinute > 0f)
                 {
-                    farmPlotMessages.Add($"  Water Usage: {stats.WaterUsagePerMinute:F1} L/min");
+                    farmPlotMessages.Add($"Water Usage: {stats.WaterUsagePerMinute:F1} L/min");
                 }
 
                 if (!string.IsNullOrWhiteSpace(stats.VentStatusText))
@@ -513,7 +509,9 @@ namespace IngameScript
 
                 if (farmGroup.IrrigationSystems.Count > 0)
                 {
-                    irrigationMessages.Add($"  Ice: {stats.IceRatio:P0}");
+                    irrigationMessages.Add(
+                        $"Ice: {stats.IceRatio:P0} ({stats.CurrentIceKg:F1} kg / {stats.MaxIceKg:F1} kg)"
+                    );
                 }
 
                 // Yield summary
@@ -539,7 +537,7 @@ namespace IngameScript
                         }
 
                         yieldMessages.Add(
-                            $"  {entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {string.Join(", ", yieldText)}"
+                            $"{entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {string.Join(", ", yieldText)}"
                         );
                     }
                 }
