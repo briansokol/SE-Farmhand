@@ -10,7 +10,6 @@ namespace IngameScript
     /// </summary>
     public partial class Program : MyGridProgram
     {
-        readonly DebugAPI Debug;
         readonly FarmGroups farmGroups;
         readonly ProgrammableBlock thisPb;
 
@@ -30,7 +29,6 @@ namespace IngameScript
 
         public Program()
         {
-            Debug = new DebugAPI(this);
             thisPb = new ProgrammableBlock(Me, this);
             farmGroups = new FarmGroups(GridTerminalSystem, this);
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
@@ -46,8 +44,6 @@ namespace IngameScript
         /// </summary>
         public void Main()
         {
-            Debug.RemoveDraw();
-
             // Build step queue when starting a new cycle
             if (currentStepIndex >= stepQueue.Count)
             {
@@ -326,7 +322,7 @@ namespace IngameScript
             {
                 if (PlotLCD.BlockIsValid(block))
                 {
-                    var plotLcd = new PlotLCD(block as IMyTextPanel, this, Debug);
+                    var plotLcd = new PlotLCD(block as IMyTextPanel, this);
                     plotLcds.Add(plotLcd);
 
                     // Find nearby farm plot (only if resolution is correct)

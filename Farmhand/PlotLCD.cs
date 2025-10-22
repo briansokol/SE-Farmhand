@@ -9,7 +9,6 @@ namespace IngameScript
     /// </summary>
     internal class PlotLCD : Block
     {
-        DebugAPI Debug;
         private readonly IMyTextPanel _lcdPanel;
         private FarmPlot _nearbyFarmPlot;
         private bool _isCorrectResolution;
@@ -39,10 +38,9 @@ namespace IngameScript
         /// </summary>
         /// <param name="lcdPanel">The Space Engineers text panel block to wrap</param>
         /// <param name="program">The parent grid program instance</param>
-        public PlotLCD(IMyTextPanel lcdPanel, MyGridProgram program, DebugAPI debug)
+        public PlotLCD(IMyTextPanel lcdPanel, MyGridProgram program)
             : base(program)
         {
-            Debug = debug;
             _lcdPanel = lcdPanel;
             _gridProgram = program;
             CheckResolution();
