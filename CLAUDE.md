@@ -8,6 +8,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## AI Behavior
 
+### Specialized Subagents
+
+This project has specialized subagents available for specific tasks. **Use these subagents proactively** when their expertise is relevant:
+
+1. **build-analyzer**: Use when you need to:
+   - Verify builds succeed after code changes
+   - Investigate compilation errors or warnings
+   - Check for build issues proactively after modifications
+   - Ensure code compiles before testing
+
+2. **codebase-researcher**: Use when you need to:
+   - Search through the codebase to find files, classes, methods, or patterns
+   - Locate where specific functionality is implemented
+   - Find examples of certain patterns (e.g., how other block types are structured)
+   - Identify files that need modification for a feature
+   - Discover dependencies or usages of particular components
+   - Understand the structure of unfamiliar code sections
+
+**Important**: Use subagents proactively, even if the user doesn't explicitly request them. For example:
+- Before implementing a new component, research the relevant Space Engineers API
+- After making code changes, verify the build succeeds
+- When encountering unfamiliar APIs, investigate them before implementing
+
 ### Code Quality Principles
 
 1. **Avoid Code Duplication**: Always prefer refactoring code into reusable methods rather than duplicating logic. If you find yourself copying similar code blocks, extract them into a shared method.

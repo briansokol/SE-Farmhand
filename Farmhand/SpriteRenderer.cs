@@ -16,34 +16,50 @@ namespace IngameScript
     }
 
     /// <summary>
+    /// Screen-size-specific layout configuration with integer pixel values
+    /// </summary>
+    internal struct ScreenLayout
+    {
+        public int Spacing;
+        public int HeaderFontHeight;
+        public float HeaderTextScale;
+        public int IconSize;
+        public int WaterRectHeight;
+        public int GrowthRectHeight;
+        public int RectWidth;
+        public int LeftMargin;
+        public int PlotPadding;
+        public bool IsSupported;
+    }
+
+    /// <summary>
     /// Provides sprite-based graphical rendering for text surfaces
     /// </summary>
     internal class SpriteRenderer
     {
-        // Layout constants
-        private const float PLOT_PADDING = 2f;
-        private const float ICON_SCALE = 0.8f;
-        private const float PLOT_SCALE = 0.8f;
-        private const float HEADER_SCALE = 0.8f;
-
         // Instance fields
         private readonly IMyTextSurface _surface;
         private readonly FarmGroup _farmGroup;
         private readonly RectangleF _viewport;
         private readonly Vector2 _textureSize;
+        private readonly bool _isScreenSizeSupported;
 
-        // Derived layout values
-        private readonly float _spacing;
-        private readonly float _headerYPosition;
-        private readonly float _headerFontHeight;
-        private readonly float _iconSize;
-        private readonly float _leftMargin;
-        private readonly float _rectHeight;
-        private readonly float _waterRectHeight;
-        private readonly float _growthRectHeight;
-        private readonly float _rectWidth;
+        // Layout values (integer-based for pixel-perfect rendering)
+        private readonly int _spacing;
+        private readonly int _headerYPosition;
+        private readonly int _headerFontHeight;
+        private readonly float _headerTextScale;
+        private readonly int _iconSize;
+        private readonly int _leftMargin;
+        private readonly int _waterRectHeight;
+        private readonly int _growthRectHeight;
+        private readonly int _rectWidth;
+        private readonly int _plotPadding;
         private readonly int _plotsPerRow;
         private readonly int _halfScreenPlots;
+
+        // Computed property: Total rect height is growth + water
+        private int _rectHeight => _growthRectHeight + _waterRectHeight;
 
         /// <summary>
         /// Initializes a new SpriteRenderer for the specified surface and farm group
@@ -54,30 +70,119 @@ namespace IngameScript
         {
             _surface = surface;
             _farmGroup = farmGroup;
-            _textureSize = surface.TextureSize;
+            _textureSize = _surface.TextureSize;
             _viewport = new RectangleF(
-                (_textureSize - surface.SurfaceSize) / 2f,
-                surface.SurfaceSize
+                (_textureSize - _surface.SurfaceSize) / 2f,
+                _surface.SurfaceSize
             );
 
-            // Initialize derived layout values
-            _spacing = _viewport.Width / 50f;
-            _headerFontHeight = _viewport.Height / 20f * HEADER_SCALE;
-            _headerYPosition = _headerFontHeight / 2f;
-            _iconSize = _viewport.Height / 8f * ICON_SCALE;
-            _leftMargin = _spacing;
-            _rectHeight = _viewport.Height / 8f * PLOT_SCALE;
-            _waterRectHeight = _rectHeight / 5f;
-            _growthRectHeight = _rectHeight * (4f / 5f);
-            _rectWidth = _growthRectHeight * 0.75f;
+            // Get integer-based layout for the screen size
+            ScreenLayout layout = GetLayoutForScreenSize(
+                (int)_viewport.Width,
+                (int)_viewport.Height
+            );
+
+            // Track if screen size is supported
+            _isScreenSizeSupported = layout.IsSupported;
+
+            // Initialize layout values with integers for pixel-perfect rendering
+            _spacing = layout.Spacing;
+            _headerFontHeight = layout.HeaderFontHeight;
+            _headerTextScale = layout.HeaderTextScale;
+            _headerYPosition = _headerFontHeight / 2;
+            _iconSize = layout.IconSize;
+            _leftMargin = layout.LeftMargin;
+            _waterRectHeight = layout.WaterRectHeight;
+            _growthRectHeight = layout.GrowthRectHeight;
+            _rectWidth = layout.RectWidth;
+            _plotPadding = layout.PlotPadding;
 
             // Calculate how many plots fit per row (accounting for icon)
-            float availableWidth = _viewport.Width - _leftMargin - _iconSize - _spacing - _spacing;
-            _plotsPerRow = (int)((availableWidth + _spacing) / (_rectWidth + _spacing));
+            int availableWidth =
+                (int)_viewport.Width - _leftMargin - _iconSize - _spacing - _spacing;
+            _plotsPerRow = (availableWidth + _spacing) / (_rectWidth + _spacing);
             if (_plotsPerRow < 1)
                 _plotsPerRow = 1;
 
             _halfScreenPlots = _plotsPerRow / 2 - 1;
+        }
+
+        /// <summary>
+        /// Gets the appropriate layout configuration for the given screen size
+        /// </summary>
+        /// <param name="width">Screen width in pixels</param>
+        /// <param name="height">Screen height in pixels</param>
+        /// <returns>Screen-specific layout with integer pixel values</returns>
+        private static ScreenLayout GetLayoutForScreenSize(int width, int height)
+        {
+            // 1024x512 - Wide LCD panel
+            if (width == 1024 && height == 512)
+            {
+                return new ScreenLayout
+                {
+                    Spacing = 10,
+                    HeaderFontHeight = 30,
+                    HeaderTextScale = 1.0f,
+                    IconSize = 50,
+                    WaterRectHeight = 10,
+                    GrowthRectHeight = 40,
+                    RectWidth = 30,
+                    LeftMargin = 10,
+                    PlotPadding = 2,
+                    IsSupported = true,
+                };
+            }
+
+            // 512x307 - Small LCD/Text panel
+            if (width == 512 && height == 307)
+            {
+                return new ScreenLayout
+                {
+                    Spacing = 6,
+                    HeaderFontHeight = 18,
+                    HeaderTextScale = 0.7f,
+                    IconSize = 36,
+                    WaterRectHeight = 8,
+                    GrowthRectHeight = 36,
+                    RectWidth = 26,
+                    LeftMargin = 6,
+                    PlotPadding = 2,
+                    IsSupported = true,
+                };
+            }
+
+            // 512x512 - Square LCD panel
+            if (width == 512 && height == 512)
+            {
+                return new ScreenLayout
+                {
+                    Spacing = 10,
+                    HeaderFontHeight = 30,
+                    HeaderTextScale = 1.0f,
+                    IconSize = 50,
+                    WaterRectHeight = 10,
+                    GrowthRectHeight = 40,
+                    RectWidth = 30,
+                    LeftMargin = 10,
+                    PlotPadding = 2,
+                    IsSupported = true,
+                };
+            }
+
+            // Unsupported screen size - return minimal layout for error display
+            return new ScreenLayout
+            {
+                Spacing = 10,
+                HeaderFontHeight = 30,
+                HeaderTextScale = 1.0f,
+                IconSize = 0,
+                WaterRectHeight = 0,
+                GrowthRectHeight = 0,
+                RectWidth = 0,
+                LeftMargin = 0,
+                PlotPadding = 0,
+                IsSupported = false,
+            };
         }
 
         /// <summary>
@@ -98,20 +203,27 @@ namespace IngameScript
         {
             _surface.ContentType = ContentType.SCRIPT;
             _surface.Script = string.Empty;
-            // _surface.ScriptBackgroundColor = Color.Black;
-            // _surface.ScriptForegroundColor = Color.White;
+
+            // Check if screen size is unsupported
+            if (!_isScreenSizeSupported)
+            {
+                using (var frame = _surface.DrawFrame())
+                {
+                    DrawUnsupportedScreenMessage(frame);
+                }
+                return;
+            }
+
+            if (_farmGroup == null || _farmGroup.FarmPlots.Count == 0)
+            {
+                return;
+            }
 
             using (var frame = _surface.DrawFrame())
             {
                 // Draw header and footer
                 DrawHeader(frame);
                 DrawFooter(frame);
-
-                if (_farmGroup == null || _farmGroup.FarmPlots.Count == 0)
-                {
-                    frame.Dispose();
-                    return;
-                }
 
                 // Group plots by PlantType, ordered by group size (largest first), empty plots last
                 var allGroups = _farmGroup.FarmPlots.GroupBy(p => p.PlantType).ToList();
@@ -168,9 +280,8 @@ namespace IngameScript
                     layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
                 }
 
-                // Start just below the header (header is at y=10 with scale 0.8)
-                float headerHeight = HEADER_SCALE * _headerFontHeight; // Approximate font height with scale
-                float currentY = _rectHeight / 2f + headerHeight + _spacing * 2f;
+                // Start just below the header
+                float currentY = _rectHeight / 2 + _headerFontHeight + _spacing * 2;
 
                 // Draw each layout row
                 foreach (var layoutRow in layoutRows)
@@ -206,7 +317,7 @@ namespace IngameScript
 
                     // Move to next layout row (based on tallest group in this row)
                     currentY +=
-                        maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2f) + _spacing;
+                        maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing;
                 }
             }
         }
@@ -280,8 +391,8 @@ namespace IngameScript
 
                 // Calculate position (offset by icon)
                 float plotStartX = columnStartX + _iconSize + _spacing;
-                float x = plotStartX + col * (_rectWidth + _spacing) + _rectWidth / 2f;
-                float y = currentY + row * (_rectHeight + _spacing * 2f);
+                float x = plotStartX + col * (_rectWidth + _spacing) + _rectWidth / 2;
+                float y = currentY + row * (_rectHeight + _spacing * 2);
 
                 // Get growth progress and determine color
                 float growthProgress = 0f;
@@ -315,7 +426,7 @@ namespace IngameScript
                 Type = SpriteType.TEXT,
                 Data = headerText,
                 Position = CreatePosition(_viewport.Width / 2f, _headerYPosition),
-                RotationOrScale = HEADER_SCALE,
+                RotationOrScale = _headerTextScale,
                 Color = _surface.ScriptForegroundColor,
                 Alignment = TextAlignment.CENTER,
                 FontId = "White",
@@ -339,7 +450,7 @@ namespace IngameScript
         {
             if (plots.Count > 0 && plots[0].IsPlantPlanted)
             {
-                float iconX = columnStartX + (_iconSize / 2f);
+                float iconX = columnStartX + (_iconSize / 2);
                 float iconY = currentY;
 
                 var groupIcon = new MySprite()
@@ -372,7 +483,8 @@ namespace IngameScript
             Color outlineColor
         )
         {
-            var growthYOffet = (_waterRectHeight + PLOT_PADDING / 2f) / 2f;
+            // Calculate vertical offset for growth section (half of water height + padding)
+            var growthYOffet = (_waterRectHeight + _plotPadding) / 2;
 
             // Draw outline rectangle with state-based color
             var outline = new MySprite()
@@ -386,34 +498,36 @@ namespace IngameScript
             };
             frame.Add(outline);
 
-            // Draw black background (creates padding inside border)
-            float padding = PLOT_PADDING;
+            // Draw black background for growth section
+            // Available height = GrowthRectHeight - 2x padding (top and bottom)
+            float growthAvailableHeight = _growthRectHeight - (2 * _plotPadding);
+            // Shift down by half padding to center the padded background within the outline
+            float backgroundY = y - growthYOffet + (_plotPadding / 2);
             var background = new MySprite()
             {
                 Type = SpriteType.TEXTURE,
                 Data = "SquareSimple",
-                Position = CreatePosition(x, y - growthYOffet),
-                Size = new Vector2(_rectWidth - padding, _growthRectHeight - padding),
-                // Color = _surface.ScriptBackgroundColor,
-                Color = Color.DimGray,
+                Position = CreatePosition(x, backgroundY),
+                Size = new Vector2(_rectWidth - _plotPadding, growthAvailableHeight),
+                Color = _surface.ScriptBackgroundColor,
                 Alignment = TextAlignment.CENTER,
             };
             frame.Add(background);
 
-            float innerPadding = PLOT_PADDING * 4f;
+            float innerPadding = _plotPadding * 4;
 
             // Draw filled rectangle based on growth
             if (growthProgress > 0f)
             {
-                float plotAvailableHeight = _growthRectHeight - innerPadding;
-                float filledHeight = plotAvailableHeight * growthProgress;
-                float filledY = y + (_growthRectHeight - filledHeight - innerPadding) / 2f;
+                // Use the same available height as the background
+                float filledHeight = (growthAvailableHeight - 2 * _plotPadding) * growthProgress;
+                float filledY = y + (_growthRectHeight - filledHeight - innerPadding) / 2;
 
                 var filled = new MySprite()
                 {
                     Type = SpriteType.TEXTURE,
                     Data = "SquareSimple",
-                    Position = CreatePosition(x, filledY - growthYOffet),
+                    Position = CreatePosition(x, filledY - growthYOffet + (_plotPadding / 2)),
                     Size = new Vector2(_rectWidth - innerPadding, filledHeight),
                     Color = outlineColor,
                     Alignment = TextAlignment.CENTER,
@@ -422,17 +536,20 @@ namespace IngameScript
             }
 
             // Draw water level indicator below the farm plot
-            float waterRectY = y + (_rectHeight / 2f) - (_waterRectHeight + padding) / 2f;
+            // Available height = WaterRectHeight - 1x padding (just the bottom)
+            float waterAvailableHeight = _waterRectHeight - _plotPadding;
+            float waterRectY = y + (_rectHeight / 2) - (_waterRectHeight + _plotPadding) / 2;
+            // Shift up by half padding to align with bottom of outline (no top padding)
+            float waterBackgroundY = waterRectY;
 
             // Water level background (black)
             var waterBackground = new MySprite()
             {
                 Type = SpriteType.TEXTURE,
                 Data = "SquareSimple",
-                Position = CreatePosition(x, waterRectY),
-                Size = new Vector2(_rectWidth - padding, _waterRectHeight - padding),
-                // Color = _surface.ScriptBackgroundColor,
-                Color = Color.DimGray,
+                Position = CreatePosition(x, waterBackgroundY),
+                Size = new Vector2(_rectWidth - (2 * _plotPadding), waterAvailableHeight),
+                Color = _surface.ScriptBackgroundColor,
                 Alignment = TextAlignment.CENTER,
             };
             frame.Add(waterBackground);
@@ -441,16 +558,17 @@ namespace IngameScript
             float waterRatio = (float)plot.WaterFilledRatio;
             if (waterRatio > 0f)
             {
+                // Use consistent padding (same as background, not innerPadding)
                 float waterAvailableWidth = _rectWidth - innerPadding;
                 float filledWidth = waterAvailableWidth * waterRatio;
-                float waterFilledX = x - (waterAvailableWidth / 2f) + (filledWidth / 2f);
+                float waterFilledX = x - (waterAvailableWidth / 2) + (filledWidth / 2);
 
                 var waterFilled = new MySprite()
                 {
                     Type = SpriteType.TEXTURE,
                     Data = "SquareSimple",
-                    Position = CreatePosition(waterFilledX, waterRectY),
-                    Size = new Vector2(filledWidth, _waterRectHeight - innerPadding),
+                    Position = CreatePosition(waterFilledX, waterBackgroundY),
+                    Size = new Vector2(filledWidth, waterAvailableHeight - _plotPadding),
                     Color = outlineColor,
                     Alignment = TextAlignment.CENTER,
                 };
@@ -491,7 +609,40 @@ namespace IngameScript
                     _viewport.Width / 2f,
                     _viewport.Height - _headerYPosition * 2f
                 ),
-                RotationOrScale = HEADER_SCALE,
+                RotationOrScale = _headerTextScale,
+                Color = _surface.ScriptForegroundColor,
+                Alignment = TextAlignment.CENTER,
+                FontId = "White",
+            };
+            frame.Add(dimensions);
+        }
+
+        /// <summary>
+        /// Draws an unsupported screen size message in the center of the screen
+        /// </summary>
+        /// <param name="frame">The sprite frame to add the message to</param>
+        private void DrawUnsupportedScreenMessage(MySpriteDrawFrame frame)
+        {
+            var message = new MySprite()
+            {
+                Type = SpriteType.TEXT,
+                Data = "Screen Size Unsupported",
+                Position = CreatePosition(_viewport.Width / 2f, _spacing),
+                RotationOrScale = 0.7f,
+                Color = _surface.ScriptForegroundColor,
+                Alignment = TextAlignment.CENTER,
+                FontId = "White",
+            };
+            frame.Add(message);
+
+            // Also show the dimensions below the message
+            string dimensionsText = $"{(int)_viewport.Width} x {(int)_viewport.Height}";
+            var dimensions = new MySprite()
+            {
+                Type = SpriteType.TEXT,
+                Data = dimensionsText,
+                Position = CreatePosition(_viewport.Width / 2f, _viewport.Height - 20f - _spacing),
+                RotationOrScale = 0.5f,
                 Color = _surface.ScriptForegroundColor,
                 Alignment = TextAlignment.CENTER,
                 FontId = "White",
