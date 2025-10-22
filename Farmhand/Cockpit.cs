@@ -302,7 +302,7 @@ namespace IngameScript
         private void DrawGraphicalUI(int screenIndex)
         {
             var screen = _cockpit.GetSurface(screenIndex);
-            var renderer = new SpriteRenderer(screen, _farmGroup);
+            var renderer = new SpriteRenderer(screen, _farmGroup, GetTitle());
             renderer.DrawGraphicalUI();
         }
 
@@ -377,37 +377,13 @@ namespace IngameScript
         private string GetHeaderAnimation(int runNumber, string title = "Farmhand")
         {
             var alignment = GetTextAlignment();
+            var animationStart = new[] { "––•", "–•–", "•––" };
+            var animationEnd = new[] { "•––", "–•–", "––•" };
+            var frameNumber = runNumber > 2 ? runNumber - 3 : runNumber;
 
-            if (alignment == TextAlignment.CENTER)
-            {
-                // Center alignment: animated dots/dashes on both sides
-                switch (runNumber)
-                {
-                    case 0:
-                        return $"––• {title} •––";
-                    case 1:
-                        return $"–•– {title} –•–";
-                    case 2:
-                        return $"•–– {title} ––•";
-                    default:
-                        return title;
-                }
-            }
-            else
-            {
-                // Left alignment: animated dots/dashes on right side only
-                switch (runNumber)
-                {
-                    case 0:
-                        return $"{title} •––";
-                    case 1:
-                        return $"{title} –•–";
-                    case 2:
-                        return $"{title} ––•";
-                    default:
-                        return title;
-                }
-            }
+            return alignment == TextAlignment.CENTER
+                ? $"{animationStart[frameNumber % animationStart.Length]} {title} {animationEnd[frameNumber % animationEnd.Length]}"
+                : $"{title} {animationEnd[frameNumber % animationEnd.Length]}";
         }
 
         /// <summary>

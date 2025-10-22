@@ -57,8 +57,16 @@ namespace IngameScript
                 "PlantedDeadColor",
                 new CustomDataConfig(
                     "Plant Dead Color",
-                    "255,0,100",
-                    "RGB color for dead plants (default: 255,0,100)"
+                    "255,0,25",
+                    "RGB color for dead plants (default: 255,0,25)"
+                )
+            },
+            {
+                "WaterLowColor",
+                new CustomDataConfig(
+                    "Water Low Color",
+                    "0,65,255",
+                    "RGB color for low water warning (default: 0,65,255)"
                 )
             },
             {
@@ -177,6 +185,22 @@ namespace IngameScript
                     _customData
                         .Get(_customDataHeader, _customDataConfigs["PlantedDeadColor"].Label)
                         .ToString(_customDataConfigs["PlantedDeadColor"].DefaultValue)
+                );
+            }
+        }
+
+        /// <summary>
+        /// Gets the color for low water warning
+        /// </summary>
+        public Color WaterLowColor
+        {
+            get
+            {
+                ParseCustomData();
+                return ParseColor(
+                    _customData
+                        .Get(_customDataHeader, _customDataConfigs["WaterLowColor"].Label)
+                        .ToString(_customDataConfigs["WaterLowColor"].DefaultValue)
                 );
             }
         }

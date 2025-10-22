@@ -124,7 +124,7 @@ namespace IngameScript
         {
             var header = GetHeaderAnimation(runNumber);
 
-            if (runNumber >= 2)
+            if (runNumber >= 5)
             {
                 runNumber = 0;
             }
@@ -314,17 +314,10 @@ namespace IngameScript
                                     ? stats.PlotSummary[plantType] + 1
                                     : 1;
 
-                                if (plotDetails.CropHealth < thisPb.HealthLowThreshold)
-                                {
-                                    stats.AlertMessages.Add(
-                                        $"Health Low: {plotDetails.CropHealth:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
-                                    );
-                                    stats.DyingPlants++;
-                                }
-
+                                // Priority: Ready to harvest > Low health warning > Growing
                                 if (farmPlot.IsPlantFullyGrown)
                                 {
-                                    // Plant is ready to harvest
+                                    // Plant is ready to harvest - show ready color even if health is low
                                     farmPlot.SetLightColor(thisPb.PlantedReadyColor);
                                     stats.FarmPlotsReadyToHarvest++;
 
@@ -335,9 +328,20 @@ namespace IngameScript
                                         ? stats.YieldSummary[plantType] + plantYield
                                         : plantYield;
                                 }
+                                else if (plotDetails.CropHealth < thisPb.HealthLowThreshold)
+                                {
+                                    // Plant is growing but health is critically low - set dead color and blink
+                                    farmPlot.SetLightColor(thisPb.PlantedDeadColor);
+                                    farmPlot.LightBlinkInterval = 2f;
+                                    farmPlot.LightBlinkLength = 50f;
+                                    stats.AlertMessages.Add(
+                                        $"Health Low: {plotDetails.CropHealth:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
+                                    );
+                                    stats.DyingPlants++;
+                                }
                                 else
                                 {
-                                    // Plant is still growing
+                                    // Plant is still growing normally
                                     farmPlot.SetLightColor(thisPb.PlantedAliveColor);
 
                                     if (
@@ -372,20 +376,38 @@ namespace IngameScript
                             stats.SeedsNeeded += farmPlot.SeedsNeeded;
                         }
 
+                        // Check for low water (only if plant is not ready and health is OK)
+                        bool isHealthLow =
+                            farmPlot.IsPlantPlanted
+                            && farmPlot.IsPlantAlive
+                            && plotDetails.CropHealth < thisPb.HealthLowThreshold;
+
+                        bool isReady = farmPlot.IsPlantPlanted && farmPlot.IsPlantFullyGrown;
+
                         if (
                             farmPlot.IsFunctional()
                             && farmPlot.WaterFilledRatio <= thisPb.WaterLowThreshold
+                            && !isHealthLow
+                            && !isReady
                         )
                         {
-                            farmPlot.LightBlinkInterval = 1f;
+                            farmPlot.SetLightColor(thisPb.WaterLowColor);
+                            farmPlot.LightBlinkInterval = 2f;
                             farmPlot.LightBlinkLength = 50f;
                             stats.AlertMessages.Add(
                                 $"Water Low: {farmPlot.WaterFilledRatio:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
                             );
                             stats.FarmPlotsLowOnWater++;
                         }
-                        else
+                        else if (!isHealthLow && !isReady)
                         {
+                            // Only turn off blinking if health is OK and plant is not ready
+                            farmPlot.LightBlinkInterval = 0f;
+                            farmPlot.LightBlinkLength = 1f;
+                        }
+                        else if (isReady)
+                        {
+                            // Plant is ready - ensure blinking is off
                             farmPlot.LightBlinkInterval = 0f;
                             farmPlot.LightBlinkLength = 1f;
                         }
@@ -513,6 +535,10 @@ namespace IngameScript
                     irrigationMessages.Add(
                         $"Ice: {stats.IceRatio:P0} ({stats.CurrentIceKg:F1} kg / {stats.MaxIceKg:F1} kg)"
                     );
+                }
+                else
+                {
+                    stats.AlertMessages.Add("No Working Irrigation Systems!");
                 }
 
                 // Yield summary
@@ -661,11 +687,17 @@ namespace IngameScript
             switch (runNumber)
             {
                 case 0:
-                    return $"{title} •––";
+                    return $"{title} •–––––";
                 case 1:
-                    return $"{title} –•–";
+                    return $"{title} –•––––";
                 case 2:
-                    return $"{title} ––•";
+                    return $"{title} ––•–––";
+                case 3:
+                    return $"{title} –––•––";
+                case 4:
+                    return $"{title} ––––•–";
+                case 5:
+                    return $"{title} –––––•";
                 default:
                     return title;
             }
