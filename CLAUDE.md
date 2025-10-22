@@ -31,6 +31,12 @@ This project has specialized subagents available for specific tasks. **Use these
 - After making code changes, verify the build succeeds
 - When encountering unfamiliar APIs, investigate them before implementing
 
+**CRITICAL: Always Build After Code Changes**: Whenever you make changes to any code files (*.cs), you MUST use the build-analyzer agent to verify the build succeeds. This ensures:
+- Code compiles without errors
+- No syntax or type errors were introduced
+- The script will work correctly in Space Engineers
+- Early detection of issues before deployment
+
 ### Code Quality Principles
 
 1. **Avoid Code Duplication**: Always prefer refactoring code into reusable methods rather than duplicating logic. If you find yourself copying similar code blocks, extract them into a shared method.

@@ -37,6 +37,8 @@ namespace IngameScript
     /// </summary>
     internal class SpriteRenderer
     {
+        private const bool DEBUG = false;
+
         // Instance fields
         private readonly IMyTextSurface _surface;
         private readonly FarmGroup _farmGroup;
@@ -59,7 +61,7 @@ namespace IngameScript
         private readonly int _halfScreenPlots;
 
         // Computed property: Total rect height is growth + water
-        private int _rectHeight => _growthRectHeight + _waterRectHeight;
+        private int RectHeight => _growthRectHeight + _waterRectHeight;
 
         /// <summary>
         /// Initializes a new SpriteRenderer for the specified surface and farm group
@@ -120,7 +122,25 @@ namespace IngameScript
             {
                 return new ScreenLayout
                 {
-                    Spacing = 10,
+                    Spacing = 6,
+                    HeaderFontHeight = 30,
+                    HeaderTextScale = 1.0f,
+                    IconSize = 50,
+                    WaterRectHeight = 10,
+                    GrowthRectHeight = 40,
+                    RectWidth = 30,
+                    LeftMargin = 10,
+                    PlotPadding = 2,
+                    IsSupported = true,
+                };
+            }
+
+            // 512x512 - Square LCD panel
+            if (width == 512 && height == 512)
+            {
+                return new ScreenLayout
+                {
+                    Spacing = 6,
                     HeaderFontHeight = 30,
                     HeaderTextScale = 1.0f,
                     IconSize = 50,
@@ -138,32 +158,14 @@ namespace IngameScript
             {
                 return new ScreenLayout
                 {
-                    Spacing = 6,
+                    Spacing = 4,
                     HeaderFontHeight = 18,
                     HeaderTextScale = 0.7f,
-                    IconSize = 36,
+                    IconSize = 44,
                     WaterRectHeight = 8,
                     GrowthRectHeight = 36,
                     RectWidth = 26,
                     LeftMargin = 6,
-                    PlotPadding = 2,
-                    IsSupported = true,
-                };
-            }
-
-            // 512x512 - Square LCD panel
-            if (width == 512 && height == 512)
-            {
-                return new ScreenLayout
-                {
-                    Spacing = 10,
-                    HeaderFontHeight = 30,
-                    HeaderTextScale = 1.0f,
-                    IconSize = 50,
-                    WaterRectHeight = 10,
-                    GrowthRectHeight = 40,
-                    RectWidth = 30,
-                    LeftMargin = 10,
                     PlotPadding = 2,
                     IsSupported = true,
                 };
@@ -223,7 +225,6 @@ namespace IngameScript
             {
                 // Draw header and footer
                 DrawHeader(frame);
-                DrawFooter(frame);
 
                 // Group plots by PlantType, ordered by group size (largest first), empty plots last
                 var allGroups = _farmGroup.FarmPlots.GroupBy(p => p.PlantType).ToList();
@@ -280,8 +281,8 @@ namespace IngameScript
                     layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
                 }
 
-                // Start just below the header
-                float currentY = _rectHeight / 2 + _headerFontHeight + _spacing * 2;
+                // Start just below the header (with double spacing)
+                float currentY = RectHeight / 2 + _headerFontHeight + _spacing * 4;
 
                 // Draw each layout row
                 foreach (var layoutRow in layoutRows)
@@ -315,9 +316,9 @@ namespace IngameScript
                         }
                     }
 
-                    // Move to next layout row (based on tallest group in this row)
+                    // Move to next layout row (based on tallest group in this row, with double spacing)
                     currentY +=
-                        maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing;
+                        maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing * 2;
                 }
             }
         }
@@ -392,7 +393,7 @@ namespace IngameScript
                 // Calculate position (offset by icon)
                 float plotStartX = columnStartX + _iconSize + _spacing;
                 float x = plotStartX + col * (_rectWidth + _spacing) + _rectWidth / 2;
-                float y = currentY + row * (_rectHeight + _spacing * 2);
+                float y = currentY + row * (RectHeight + _spacing * 2);
 
                 // Get growth progress and determine color
                 float growthProgress = 0f;
@@ -492,7 +493,7 @@ namespace IngameScript
                 Type = SpriteType.TEXTURE,
                 Data = "SquareSimple",
                 Position = CreatePosition(x, y),
-                Size = new Vector2(_rectWidth, _rectHeight),
+                Size = new Vector2(_rectWidth, RectHeight),
                 Color = outlineColor,
                 Alignment = TextAlignment.CENTER,
             };
@@ -508,7 +509,7 @@ namespace IngameScript
                 Type = SpriteType.TEXTURE,
                 Data = "SquareSimple",
                 Position = CreatePosition(x, backgroundY),
-                Size = new Vector2(_rectWidth - _plotPadding, growthAvailableHeight),
+                Size = new Vector2(_rectWidth - (2 * _plotPadding), growthAvailableHeight),
                 Color = _surface.ScriptBackgroundColor,
                 Alignment = TextAlignment.CENTER,
             };
@@ -536,18 +537,18 @@ namespace IngameScript
             }
 
             // Draw water level indicator below the farm plot
-            // Available height = WaterRectHeight - 1x padding (just the bottom)
+            // Available height = WaterRectHeight - 2x padding (top and bottom, matching sides)
             float waterAvailableHeight = _waterRectHeight - _plotPadding;
-            float waterRectY = y + (_rectHeight / 2) - (_waterRectHeight + _plotPadding) / 2;
-            // Shift up by half padding to align with bottom of outline (no top padding)
-            float waterBackgroundY = waterRectY;
+
+            // Vertical position for water rectangle
+            float waterRectY = y + (RectHeight / 2) - (_waterRectHeight / 2) - _plotPadding / 2;
 
             // Water level background (black)
             var waterBackground = new MySprite()
             {
                 Type = SpriteType.TEXTURE,
                 Data = "SquareSimple",
-                Position = CreatePosition(x, waterBackgroundY),
+                Position = CreatePosition(x, waterRectY),
                 Size = new Vector2(_rectWidth - (2 * _plotPadding), waterAvailableHeight),
                 Color = _surface.ScriptBackgroundColor,
                 Alignment = TextAlignment.CENTER,
@@ -558,7 +559,7 @@ namespace IngameScript
             float waterRatio = (float)plot.WaterFilledRatio;
             if (waterRatio > 0f)
             {
-                // Use consistent padding (same as background, not innerPadding)
+                // Use consistent padding with growth bar
                 float waterAvailableWidth = _rectWidth - innerPadding;
                 float filledWidth = waterAvailableWidth * waterRatio;
                 float waterFilledX = x - (waterAvailableWidth / 2) + (filledWidth / 2);
@@ -567,8 +568,8 @@ namespace IngameScript
                 {
                     Type = SpriteType.TEXTURE,
                     Data = "SquareSimple",
-                    Position = CreatePosition(waterFilledX, waterBackgroundY),
-                    Size = new Vector2(filledWidth, waterAvailableHeight - _plotPadding),
+                    Position = CreatePosition(waterFilledX, waterRectY),
+                    Size = new Vector2(filledWidth, waterAvailableHeight - (2 * _plotPadding)),
                     Color = outlineColor,
                     Alignment = TextAlignment.CENTER,
                 };

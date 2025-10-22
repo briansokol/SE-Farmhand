@@ -256,6 +256,7 @@ namespace IngameScript
 
                 var group = farmGroups.GetGroup(groupName);
                 group.ProgrammableBlock = thisPb;
+                group.RunNumber = runNumber;
 
                 farmGroups.FindFarmPlots(groupName);
 
