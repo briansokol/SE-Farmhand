@@ -234,26 +234,12 @@ namespace IngameScript
         /// <summary>
         /// Draws the graphical UI using sprites
         /// </summary>
-        private void DrawGraphicalUI()
-        {
-            var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle());
-            renderer.DrawGraphicalUI();
-        }
-
-        /// <summary>
-        /// Draws the graphical UI using sprites (coroutine version)
-        /// </summary>
-        public IEnumerator<bool> DrawGraphicalUICoroutine()
+        public void DrawGraphicalUI()
         {
             if (IsFunctional() && _lcdPanel != null && IsGraphicalMode())
             {
                 var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle());
-                var coroutine = renderer.DrawGraphicalUICoroutine();
-                while (coroutine.MoveNext())
-                {
-                    yield return true;
-                }
-                coroutine.Dispose();
+                renderer.DrawGraphicalUI();
             }
         }
 

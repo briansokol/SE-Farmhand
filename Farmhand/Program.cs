@@ -19,10 +19,12 @@ namespace IngameScript
         readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
         readonly string Version = "v0.8.0";
-        readonly string PublishedDate = "2025-10-17";
+        readonly string PublishedDate = "2025-10-23";
 
-        // Coroutine management
-        readonly List<IEnumerator<bool>> activeCoroutines = new List<IEnumerator<bool>>();
+        // Step-based state machine management
+        delegate void Step();
+        readonly List<Step> stepQueue = new List<Step>();
+        int currentStepIndex = 0;
         double currentCycleTime = 0;
         double lastCycleTime = 0;
 
@@ -46,14 +48,14 @@ namespace IngameScript
         {
             Debug.RemoveDraw();
 
-            // Start new coroutines immediately when no operations are running
-            if (activeCoroutines.Count == 0)
+            // Build step queue when starting a new cycle
+            if (currentStepIndex >= stepQueue.Count)
             {
-                RestartCoroutineCycle();
+                RestartCycle();
             }
 
-            // Execute coroutines
-            ExecuteCoroutines();
+            // Execute current step
+            ExecuteCurrentStep();
 
             // Accumulate cycle time
             currentCycleTime += Runtime.TimeSinceLastRun.TotalMilliseconds;
@@ -62,65 +64,104 @@ namespace IngameScript
             Echo(
                 $"Quota: {(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2}"
             );
-            Echo($"Active Coroutines: {activeCoroutines.Count}");
+            Echo($"Current Step: {currentStepIndex}/{stepQueue.Count}");
             Echo($"Last Cycle Time: {lastCycleTime / 1000:F2}s");
         }
 
         /// <summary>
-        /// Executes active coroutines sequentially and manages their lifecycle
+        /// Executes the current step in the step queue and advances to the next step
         /// </summary>
-        void ExecuteCoroutines()
+        void ExecuteCurrentStep()
         {
-            if (activeCoroutines.Count == 0)
+            if (currentStepIndex >= stepQueue.Count)
                 return;
 
-            // Always execute the first coroutine in the list
-            var coroutine = activeCoroutines[0];
             try
             {
-                if (!coroutine.MoveNext())
-                {
-                    // Coroutine completed, dispose it
-                    coroutine.Dispose();
-                    activeCoroutines.RemoveAt(0);
+                // Execute the current step
+                stepQueue[currentStepIndex]();
 
-                    // Start the next coroutine in sequence
-                    if (activeCoroutines.Count == 0)
-                    {
-                        RestartCoroutineCycle();
-                    }
-                }
+                // Advance to next step
+                currentStepIndex++;
             }
             catch
             {
-                // Error in coroutine, dispose and skip to next
-                coroutine.Dispose();
-                activeCoroutines.RemoveAt(0);
-
-                // Start the next coroutine in sequence
-                if (activeCoroutines.Count == 0)
-                {
-                    RestartCoroutineCycle();
-                }
+                // Error in step, skip to next
+                currentStepIndex++;
             }
         }
 
         /// <summary>
-        /// Restarts the coroutine cycle and prints diagnostic information
+        /// Restarts the cycle by building a new step queue and printing diagnostic information
         /// </summary>
-        void RestartCoroutineCycle()
+        void RestartCycle()
         {
             // Save the completed cycle time and reset for new cycle
             lastCycleTime = currentCycleTime;
             currentCycleTime = 0;
+            currentStepIndex = 0;
 
-            // All coroutines completed, restart the cycle
+            // Print diagnostic header
             PrintDiagnosticHeader();
 
-            activeCoroutines.Add(FindBlocksCoroutine());
-            activeCoroutines.Add(PrintHeaderCoroutine());
-            activeCoroutines.Add(GetBlockStateCoroutine());
-            activeCoroutines.Add(PrintOutputCoroutine());
+            // Build the step queue dynamically based on what blocks exist
+            BuildStepQueue();
+        }
+
+        /// <summary>
+        /// Builds the step queue dynamically based on what blocks are currently available
+        /// </summary>
+        void BuildStepQueue()
+        {
+            stepQueue.Clear();
+
+            // Always find FarmLCD blocks first
+            stepQueue.Add(FindFarmLCDBlocks);
+
+            // Always find PlotLCD blocks
+            stepQueue.Add(FindPlotLCDBlocks);
+
+            // Only print headers if we have FarmLCD displays
+            bool hasFarmLcdDisplays = farmGroups
+                .GetAllGroups()
+                .Any(g => g.LcdPanels.Count > 0 || g.Cockpits.Count > 0);
+
+            if (hasFarmLcdDisplays)
+            {
+                stepQueue.Add(PrintHeaders);
+            }
+
+            // Only update block state if we have farm groups
+            if (farmGroups.GetAllGroups().Any())
+            {
+                stepQueue.Add(UpdateBlockState);
+            }
+
+            // Render text displays if we have any text-mode LCDs or cockpits
+            bool hasTextDisplays = farmGroups
+                .GetAllGroups()
+                .Any(g => g.LcdPanels.Any(p => !p.IsGraphicalMode()) || g.Cockpits.Count > 0);
+
+            if (hasTextDisplays)
+            {
+                stepQueue.Add(RenderTextDisplays);
+            }
+
+            // Render graphical displays if we have any graphical-mode LCDs
+            bool hasGraphicalDisplays = farmGroups
+                .GetAllGroups()
+                .Any(g => g.LcdPanels.Any(p => p.IsGraphicalMode()));
+
+            if (hasGraphicalDisplays)
+            {
+                stepQueue.Add(RenderGraphicalDisplays);
+            }
+
+            // Render PlotLCDs if we have any
+            if (plotLcds.Count > 0)
+            {
+                stepQueue.Add(RenderPlotLCDs);
+            }
         }
 
         /// <summary>
@@ -187,9 +228,9 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Prints header to LCD panels and cockpits (coroutine version)
+        /// Prints header to LCD panels and cockpits
         /// </summary>
-        IEnumerator<bool> PrintHeaderCoroutine()
+        void PrintHeaders()
         {
             farmGroups
                 .GetAllGroups()
@@ -204,14 +245,12 @@ namespace IngameScript
                     );
                     WriteToMainOutput(farmGroup.GroupName, "", "Header", isHeader: true);
                 });
-
-            yield return true;
         }
 
         /// <summary>
-        /// Discovers and categorizes blocks with [FarmLCD] and [PlotLCD] tags for farm management (coroutine version)
+        /// Discovers and categorizes blocks with [FarmLCD] tags for farm management
         /// </summary>
-        IEnumerator<bool> FindBlocksCoroutine()
+        void FindFarmLCDBlocks()
         {
             var lcdPanels = new List<LcdPanel>();
             var cockpits = new List<Cockpit>();
@@ -219,8 +258,6 @@ namespace IngameScript
             // Find the blocks with [FarmLCD] in their custom name
             List<IMyTerminalBlock> lcdTaggedBlocks = new List<IMyTerminalBlock>();
             GridTerminalSystem.SearchBlocksOfName($"[{lcdTag}]", lcdTaggedBlocks);
-
-            yield return true; // Yield after grid search
 
             lcdTaggedBlocks.ForEach(block =>
             {
@@ -231,28 +268,6 @@ namespace IngameScript
                 else if (LcdPanel.BlockIsValid(block as IMyFunctionalBlock))
                 {
                     lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this));
-                }
-            });
-
-            // Find blocks with [PlotLCD] in their custom name
-            plotLcds.Clear();
-            List<IMyTerminalBlock> plotLcdTaggedBlocks = new List<IMyTerminalBlock>();
-            GridTerminalSystem.SearchBlocksOfName($"[{plotLcdTag}]", plotLcdTaggedBlocks);
-
-            yield return true; // Yield after grid search
-
-            plotLcdTaggedBlocks.ForEach(block =>
-            {
-                if (PlotLCD.BlockIsValid(block))
-                {
-                    var plotLcd = new PlotLCD(block as IMyTextPanel, this, Debug);
-                    plotLcds.Add(plotLcd);
-
-                    // Find nearby farm plot (only if resolution is correct)
-                    if (plotLcd.IsCorrectResolution)
-                    {
-                        plotLcd.FindNearbyFarmPlot();
-                    }
                 }
             });
 
@@ -279,8 +294,6 @@ namespace IngameScript
             // Remove those farm groups that are no longer referenced by any LCD panel or this programmable block
             farmGroups.RemoveGroupsNotInList(groupNames);
 
-            yield return true; // Yield after removing old groups
-
             // For each group name, find and register the blocks
             foreach (var groupName in groupNames)
             {
@@ -293,29 +306,42 @@ namespace IngameScript
                 group.RunNumber = runNumber;
 
                 farmGroups.FindFarmPlots(groupName);
-
-                // Wait a tick if there are more than 50 farm plots to process
-                if (group.FarmPlots.Count > 50)
-                {
-                    yield return true;
-                }
-
                 farmGroups.FindIrrigationSystems(groupName);
                 farmGroups.FindAirVents(groupName);
                 farmGroups.FindTimers(groupName);
-
-                // Wait a tick if there are more than 2 groups to process
-                if (groupNames.Count > 2)
-                {
-                    yield return true;
-                }
             }
         }
 
         /// <summary>
-        /// Updates state of all farm blocks and prepares output messages (coroutine version)
+        /// Discovers and categorizes blocks with [PlotLCD] tags
         /// </summary>
-        IEnumerator<bool> GetBlockStateCoroutine()
+        void FindPlotLCDBlocks()
+        {
+            // Find blocks with [PlotLCD] in their custom name
+            plotLcds.Clear();
+            List<IMyTerminalBlock> plotLcdTaggedBlocks = new List<IMyTerminalBlock>();
+            GridTerminalSystem.SearchBlocksOfName($"[{plotLcdTag}]", plotLcdTaggedBlocks);
+
+            plotLcdTaggedBlocks.ForEach(block =>
+            {
+                if (PlotLCD.BlockIsValid(block))
+                {
+                    var plotLcd = new PlotLCD(block as IMyTextPanel, this, Debug);
+                    plotLcds.Add(plotLcd);
+
+                    // Find nearby farm plot (only if resolution is correct)
+                    if (plotLcd.IsCorrectResolution)
+                    {
+                        plotLcd.FindNearbyFarmPlot();
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// Updates state of all farm blocks and prepares output messages
+        /// </summary>
+        void UpdateBlockState()
         {
             var allGroups = farmGroups.GetAllGroups();
 
@@ -647,64 +673,67 @@ namespace IngameScript
                     );
                     WriteToMainOutput(groupName, "", "ShowYield");
                 }
-
-                yield return true; // Yield after processing each farm group
             }
         }
 
         /// <summary>
-        /// Flushes accumulated text output to all LCD panels and cockpit screens (coroutine version)
+        /// Renders text-mode LCD panels and cockpit screens
         /// </summary>
-        IEnumerator<bool> PrintOutputCoroutine()
+        void RenderTextDisplays()
         {
             thisPb.FlushTextToScreen();
 
             var allGroups = farmGroups.GetAllGroups();
             foreach (var farmGroup in allGroups)
             {
-                // Process LCD panels
+                // Process text-mode LCD panels
                 foreach (var panel in farmGroup.LcdPanels)
                 {
-                    panel.SetFarmGroup(farmGroup);
-
-                    // Check if panel is in graphical mode
-                    if (panel.IsGraphicalMode())
+                    if (!panel.IsGraphicalMode())
                     {
-                        // Use coroutine for graphical rendering
-                        var coroutine = panel.DrawGraphicalUICoroutine();
-                        while (coroutine.MoveNext())
-                        {
-                            yield return true;
-                        }
-                        coroutine.Dispose();
-                    }
-                    else
-                    {
-                        // Use synchronous text rendering (fast)
+                        panel.SetFarmGroup(farmGroup);
                         panel.FlushTextToScreen();
                     }
                 }
 
-                // Process cockpits (text rendering is fast, no coroutine needed)
+                // Process cockpits (always text mode)
                 farmGroup.Cockpits.ForEach(cockpit =>
                 {
                     cockpit.SetFarmGroup(farmGroup);
                     cockpit.FlushTextToScreens();
                 });
             }
+        }
 
-            // Render PlotLCDs using coroutines (independent of farm groups)
+        /// <summary>
+        /// Renders graphical-mode LCD panels using sprites
+        /// </summary>
+        void RenderGraphicalDisplays()
+        {
+            var allGroups = farmGroups.GetAllGroups();
+            foreach (var farmGroup in allGroups)
+            {
+                // Process graphical-mode LCD panels
+                foreach (var panel in farmGroup.LcdPanels)
+                {
+                    if (panel.IsGraphicalMode())
+                    {
+                        panel.SetFarmGroup(farmGroup);
+                        panel.DrawGraphicalUI();
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Renders PlotLCD displays
+        /// </summary>
+        void RenderPlotLCDs()
+        {
             foreach (var plotLcd in plotLcds)
             {
-                var coroutine = plotLcd.RenderCoroutine(runNumber, thisPb);
-                while (coroutine.MoveNext())
-                {
-                    yield return true;
-                }
-                coroutine.Dispose();
+                plotLcd.Render(runNumber, thisPb);
             }
-
-            yield return true;
         }
 
         /// <summary>

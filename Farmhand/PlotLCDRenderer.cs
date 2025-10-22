@@ -67,26 +67,6 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Draws the plot status display (or "Farm Plot Not Found" message) - coroutine version
-        /// </summary>
-        public IEnumerator<bool> DrawPlotStatusCoroutine()
-        {
-            yield return true; // Yield before starting sprite drawing
-
-            using (var frame = _surface.DrawFrame())
-            {
-                if (_farmPlot == null)
-                {
-                    DrawNotFoundMessage(frame);
-                }
-                else
-                {
-                    DrawPlotDisplay(frame);
-                }
-            }
-        }
-
-        /// <summary>
         /// Draws "Farm Plot Not Found" message centered on screen
         /// </summary>
         private void DrawNotFoundMessage(MySpriteDrawFrame frame)
