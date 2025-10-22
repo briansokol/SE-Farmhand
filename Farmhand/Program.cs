@@ -662,11 +662,30 @@ namespace IngameScript
             var allGroups = farmGroups.GetAllGroups();
             foreach (var farmGroup in allGroups)
             {
-                farmGroup.LcdPanels.ForEach(panel =>
+                // Process LCD panels
+                foreach (var panel in farmGroup.LcdPanels)
                 {
                     panel.SetFarmGroup(farmGroup);
-                    panel.FlushTextToScreen();
-                });
+
+                    // Check if panel is in graphical mode
+                    if (panel.IsGraphicalMode())
+                    {
+                        // Use coroutine for graphical rendering
+                        var coroutine = panel.DrawGraphicalUICoroutine();
+                        while (coroutine.MoveNext())
+                        {
+                            yield return true;
+                        }
+                        coroutine.Dispose();
+                    }
+                    else
+                    {
+                        // Use synchronous text rendering (fast)
+                        panel.FlushTextToScreen();
+                    }
+                }
+
+                // Process cockpits (text rendering is fast, no coroutine needed)
                 farmGroup.Cockpits.ForEach(cockpit =>
                 {
                     cockpit.SetFarmGroup(farmGroup);
@@ -674,11 +693,16 @@ namespace IngameScript
                 });
             }
 
-            // Render PlotLCDs (independent of farm groups)
-            plotLcds.ForEach(plotLcd =>
+            // Render PlotLCDs using coroutines (independent of farm groups)
+            foreach (var plotLcd in plotLcds)
             {
-                plotLcd.Render(runNumber, thisPb);
-            });
+                var coroutine = plotLcd.RenderCoroutine(runNumber, thisPb);
+                while (coroutine.MoveNext())
+                {
+                    yield return true;
+                }
+                coroutine.Dispose();
+            }
 
             yield return true;
         }

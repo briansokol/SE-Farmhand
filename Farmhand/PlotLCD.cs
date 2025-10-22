@@ -170,6 +170,46 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Renders the appropriate display based on resolution and farm plot availability (coroutine version)
+        /// </summary>
+        /// <param name="runNumber">Animation frame number for blinking effects (0-5)</param>
+        /// <param name="programmableBlock">Reference to the programmable block for color configuration</param>
+        public IEnumerator<bool> RenderCoroutine(int runNumber, ProgrammableBlock programmableBlock)
+        {
+            if (!IsFunctional() || _lcdPanel == null)
+            {
+                yield break;
+            }
+
+            // Set content type to SCRIPT for sprite rendering
+            _lcdPanel.ContentType = VRage.Game.GUI.TextPanel.ContentType.SCRIPT;
+
+            if (!_isCorrectResolution)
+            {
+                // Display "Screen Size Unsupported" message in text mode
+                _lcdPanel.ContentType = VRage.Game.GUI.TextPanel.ContentType.TEXT_AND_IMAGE;
+                _lcdPanel.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.CENTER;
+                _lcdPanel.WriteText("Screen Size Unsupported\n\nExpected: 512 x 73", false);
+            }
+            else
+            {
+                // Use sprite renderer for correct resolution displays
+                var renderer = new PlotLCDRenderer(
+                    _lcdPanel,
+                    _nearbyFarmPlot,
+                    runNumber,
+                    programmableBlock
+                );
+                var coroutine = renderer.DrawPlotStatusCoroutine();
+                while (coroutine.MoveNext())
+                {
+                    yield return true;
+                }
+                coroutine.Dispose();
+            }
+        }
+
+        /// <summary>
         /// Validates whether a block can be used as a PlotLCD
         /// </summary>
         /// <param name="block">The text panel block to validate</param>

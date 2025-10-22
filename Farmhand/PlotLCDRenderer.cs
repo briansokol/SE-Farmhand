@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
 using VRageMath;
@@ -52,6 +53,26 @@ namespace IngameScript
         /// </summary>
         public void DrawPlotStatus()
         {
+            using (var frame = _surface.DrawFrame())
+            {
+                if (_farmPlot == null)
+                {
+                    DrawNotFoundMessage(frame);
+                }
+                else
+                {
+                    DrawPlotDisplay(frame);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws the plot status display (or "Farm Plot Not Found" message) - coroutine version
+        /// </summary>
+        public IEnumerator<bool> DrawPlotStatusCoroutine()
+        {
+            yield return true; // Yield before starting sprite drawing
+
             using (var frame = _surface.DrawFrame())
             {
                 if (_farmPlot == null)

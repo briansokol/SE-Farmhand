@@ -241,6 +241,23 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Draws the graphical UI using sprites (coroutine version)
+        /// </summary>
+        public IEnumerator<bool> DrawGraphicalUICoroutine()
+        {
+            if (IsFunctional() && _lcdPanel != null && IsGraphicalMode())
+            {
+                var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle());
+                var coroutine = renderer.DrawGraphicalUICoroutine();
+                while (coroutine.MoveNext())
+                {
+                    yield return true;
+                }
+                coroutine.Dispose();
+            }
+        }
+
+        /// <summary>
         /// Checks if a specific category is set to be visible on the LCD panel
         /// </summary>
         /// <param name="category">The category to check</param>
