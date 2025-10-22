@@ -10,10 +10,13 @@ namespace IngameScript
     /// </summary>
     public partial class Program : MyGridProgram
     {
+        readonly DebugAPI Debug;
         readonly FarmGroups farmGroups;
         readonly ProgrammableBlock thisPb;
 
         readonly string lcdTag = "FarmLCD";
+        readonly string plotLcdTag = "PlotLCD";
+        readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
         readonly string Version = "v0.8.0";
         readonly string PublishedDate = "2025-10-17";
@@ -25,6 +28,7 @@ namespace IngameScript
 
         public Program()
         {
+            Debug = new DebugAPI(this);
             thisPb = new ProgrammableBlock(Me, this);
             farmGroups = new FarmGroups(GridTerminalSystem, this);
             Runtime.UpdateFrequency = UpdateFrequency.Update10;
@@ -40,6 +44,8 @@ namespace IngameScript
         /// </summary>
         public void Main()
         {
+            Debug.RemoveDraw();
+
             // Start new coroutines immediately when no operations are running
             if (activeCoroutines.Count == 0)
             {
@@ -172,6 +178,12 @@ namespace IngameScript
                         );
                     }
                 });
+
+            // Print PlotLCD count (independent of groups)
+            if (plotLcds.Count > 0)
+            {
+                WriteToDiagnosticOutput($"Plot LCDs: {plotLcds.Count}");
+            }
         }
 
         /// <summary>
@@ -197,7 +209,7 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Discovers and categorizes blocks with [FarmLCD] tag for farm management (coroutine version)
+        /// Discovers and categorizes blocks with [FarmLCD] and [PlotLCD] tags for farm management (coroutine version)
         /// </summary>
         IEnumerator<bool> FindBlocksCoroutine()
         {
@@ -219,6 +231,28 @@ namespace IngameScript
                 else if (LcdPanel.BlockIsValid(block as IMyFunctionalBlock))
                 {
                     lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this));
+                }
+            });
+
+            // Find blocks with [PlotLCD] in their custom name
+            plotLcds.Clear();
+            List<IMyTerminalBlock> plotLcdTaggedBlocks = new List<IMyTerminalBlock>();
+            GridTerminalSystem.SearchBlocksOfName($"[{plotLcdTag}]", plotLcdTaggedBlocks);
+
+            yield return true; // Yield after grid search
+
+            plotLcdTaggedBlocks.ForEach(block =>
+            {
+                if (PlotLCD.BlockIsValid(block))
+                {
+                    var plotLcd = new PlotLCD(block as IMyTextPanel, this, Debug);
+                    plotLcds.Add(plotLcd);
+
+                    // Find nearby farm plot (only if resolution is correct)
+                    if (plotLcd.IsCorrectResolution)
+                    {
+                        plotLcd.FindNearbyFarmPlot();
+                    }
                 }
             });
 
@@ -640,6 +674,12 @@ namespace IngameScript
                 });
             }
 
+            // Render PlotLCDs (independent of farm groups)
+            plotLcds.ForEach(plotLcd =>
+            {
+                plotLcd.Render(runNumber, thisPb);
+            });
+
             yield return true;
         }
 
@@ -684,23 +724,10 @@ namespace IngameScript
         string GetHeaderAnimation(int runNumber)
         {
             var title = "Farmhand";
-            switch (runNumber)
-            {
-                case 0:
-                    return $"{title} •–––––";
-                case 1:
-                    return $"{title} –•––––";
-                case 2:
-                    return $"{title} ––•–––";
-                case 3:
-                    return $"{title} –––•––";
-                case 4:
-                    return $"{title} ––––•–";
-                case 5:
-                    return $"{title} –––––•";
-                default:
-                    return title;
-            }
+            var animationEnd = new[] { "•––", "–•–", "––•" };
+            var frameNumber = runNumber > 2 ? runNumber - 3 : runNumber;
+
+            return $"{title} {animationEnd[frameNumber % animationEnd.Length]}";
         }
     }
 }
