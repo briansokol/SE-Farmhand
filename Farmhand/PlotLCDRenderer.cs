@@ -71,17 +71,18 @@ namespace IngameScript
         /// </summary>
         private void DrawNotFoundMessage(MySpriteDrawFrame frame)
         {
-            var message = new MySprite()
-            {
-                Type = SpriteType.TEXT,
-                Data = "Farm Plot Not Found",
-                Position = CreatePosition(_viewport.Width / 2f, _viewport.Height / 3),
-                RotationOrScale = 0.8f,
-                Color = _surface.ScriptForegroundColor,
-                Alignment = TextAlignment.CENTER,
-                FontId = "White",
-            };
-            frame.Add(message);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXT,
+                    Data = "Farm Plot Not Found",
+                    Position = CreatePosition(_viewport.Width / 2f, _viewport.Height / 3),
+                    RotationOrScale = 0.8f,
+                    Color = _surface.ScriptForegroundColor,
+                    Alignment = TextAlignment.CENTER,
+                    FontId = "White",
+                }
+            );
         }
 
         /// <summary>
@@ -155,15 +156,16 @@ namespace IngameScript
         /// </summary>
         private void DrawPlantIcon(MySpriteDrawFrame frame, float x, float y)
         {
-            var icon = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = _farmPlot.PlantId,
-                Position = CreatePosition(x, y),
-                Size = new Vector2(ICON_SIZE, ICON_SIZE),
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(icon);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = _farmPlot.PlantId,
+                    Position = CreatePosition(x, y),
+                    Size = new Vector2(ICON_SIZE, ICON_SIZE),
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
         }
 
         /// <summary>
@@ -178,30 +180,32 @@ namespace IngameScript
         )
         {
             // Layer 1: Colored background (outline)
-            var coloredBackground = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = CreatePosition(x, y),
-                Size = new Vector2(WATER_BAR_WIDTH, barHeight),
-                Color = outlineColor,
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(coloredBackground);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Position = CreatePosition(x, y),
+                    Size = new Vector2(WATER_BAR_WIDTH, barHeight),
+                    Color = outlineColor,
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
 
             // Layer 2: Black background (1px smaller on all sides)
             float blackWidth = WATER_BAR_WIDTH - (2 * BAR_PADDING);
             float blackHeight = barHeight - (2 * BAR_PADDING);
-            var blackBackground = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = CreatePosition(x, y),
-                Size = new Vector2(blackWidth, blackHeight),
-                Color = _surface.ScriptBackgroundColor,
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(blackBackground);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Position = CreatePosition(x, y),
+                    Size = new Vector2(blackWidth, blackHeight),
+                    Color = _surface.ScriptBackgroundColor,
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
 
             // Layer 3: Water fill (grows from bottom, 1px padding from black background)
             float waterRatio = (float)_farmPlot.WaterFilledRatio;
@@ -217,16 +221,17 @@ namespace IngameScript
                 // Position from bottom (negative y offset for bottom alignment)
                 float fillY = y + (fillMaxHeight / 2f) - (fillHeight / 2f);
 
-                var waterFill = new MySprite()
-                {
-                    Type = SpriteType.TEXTURE,
-                    Data = "SquareSimple",
-                    Position = CreatePosition(x, fillY),
-                    Size = new Vector2(fillWidth, fillHeight),
-                    Color = waterBarColor,
-                    Alignment = TextAlignment.CENTER,
-                };
-                frame.Add(waterFill);
+                frame.Add(
+                    new MySprite()
+                    {
+                        Type = SpriteType.TEXTURE,
+                        Data = "SquareSimple",
+                        Position = CreatePosition(x, fillY),
+                        Size = new Vector2(fillWidth, fillHeight),
+                        Color = waterBarColor,
+                        Alignment = TextAlignment.CENTER,
+                    }
+                );
             }
         }
 
@@ -245,30 +250,32 @@ namespace IngameScript
         )
         {
             // Layer 1: Colored background (outline)
-            var coloredBackground = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = CreatePosition(x, y),
-                Size = new Vector2(barWidth, barHeight),
-                Color = outlineColor,
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(coloredBackground);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Position = CreatePosition(x, y),
+                    Size = new Vector2(barWidth, barHeight),
+                    Color = outlineColor,
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
 
             // Layer 2: Black background (1px smaller on all sides)
             float blackWidth = barWidth - (2 * BAR_PADDING);
             float blackHeight = barHeight - (2 * BAR_PADDING);
-            var blackBackground = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = CreatePosition(x, y),
-                Size = new Vector2(blackWidth, blackHeight),
-                Color = _surface.ScriptBackgroundColor,
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(blackBackground);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Position = CreatePosition(x, y),
+                    Size = new Vector2(blackWidth, blackHeight),
+                    Color = _surface.ScriptBackgroundColor,
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
 
             // Layer 3: Growth fill (grows from left, 1px padding from black background)
             if (growthProgress > 0f)
@@ -280,16 +287,17 @@ namespace IngameScript
                 // Position from left (negative x offset for left alignment)
                 float fillX = x - (fillMaxWidth / 2f) + (fillWidth / 2f);
 
-                var growthFill = new MySprite()
-                {
-                    Type = SpriteType.TEXTURE,
-                    Data = "SquareSimple",
-                    Position = CreatePosition(fillX, y),
-                    Size = new Vector2(fillWidth, fillHeight),
-                    Color = progressBarColor,
-                    Alignment = TextAlignment.CENTER,
-                };
-                frame.Add(growthFill);
+                frame.Add(
+                    new MySprite()
+                    {
+                        Type = SpriteType.TEXTURE,
+                        Data = "SquareSimple",
+                        Position = CreatePosition(fillX, y),
+                        Size = new Vector2(fillWidth, fillHeight),
+                        Color = progressBarColor,
+                        Alignment = TextAlignment.CENTER,
+                    }
+                );
             }
         }
 

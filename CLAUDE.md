@@ -52,6 +52,41 @@ This project has specialized subagents available for specific tasks. **Use these
 - Extract complex logic into well-named helper methods
 - Maintain consistency with existing code style and naming conventions
 
+### Sprite Creation Pattern
+
+When creating sprites in rendering classes (e.g., `SpriteRenderer`, `PlotLCDRenderer`), always use inline sprite creation without intermediate variables:
+
+**Preferred Pattern:**
+```csharp
+frame.Add(
+    new MySprite()
+    {
+        Type = SpriteType.TEXTURE,
+        Data = "SquareSimple",
+        Position = CreatePosition(x, y),
+        Size = new Vector2(width, height),
+        Color = color,
+        Alignment = TextAlignment.CENTER,
+    }
+);
+```
+
+**Avoid:**
+```csharp
+var sprite = new MySprite()
+{
+    Type = SpriteType.TEXTURE,
+    Data = "SquareSimple",
+    Position = CreatePosition(x, y),
+    Size = new Vector2(width, height),
+    Color = color,
+    Alignment = TextAlignment.CENTER,
+};
+frame.Add(sprite);
+```
+
+This pattern keeps sprite creation concise and reduces unnecessary local variables.
+
 ### Communication
 
 - Be clear about what you're doing and why

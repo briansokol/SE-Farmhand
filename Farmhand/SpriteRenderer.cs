@@ -526,17 +526,18 @@ namespace IngameScript
         {
             var headerTitle = string.IsNullOrEmpty(_customTitle) ? "Farmhand" : _customTitle;
             string headerText = GetHeaderAnimation(_farmGroup?.RunNumber ?? 0, headerTitle);
-            var header = new MySprite()
-            {
-                Type = SpriteType.TEXT,
-                Data = headerText,
-                Position = CreatePosition(_viewport.Width / 2f, _headerYPosition),
-                RotationOrScale = _headerTextScale,
-                Color = _surface.ScriptForegroundColor,
-                Alignment = TextAlignment.CENTER,
-                FontId = "White",
-            };
-            frame.Add(header);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXT,
+                    Data = headerText,
+                    Position = CreatePosition(_viewport.Width / 2f, _headerYPosition),
+                    RotationOrScale = _headerTextScale,
+                    Color = _surface.ScriptForegroundColor,
+                    Alignment = TextAlignment.CENTER,
+                    FontId = "White",
+                }
+            );
         }
 
         /// <summary>
@@ -558,15 +559,16 @@ namespace IngameScript
                 float iconX = columnStartX + (_iconSize / 2);
                 float iconY = currentY;
 
-                var groupIcon = new MySprite()
-                {
-                    Type = SpriteType.TEXTURE,
-                    Data = plots[0].PlantId,
-                    Position = CreatePosition(iconX, iconY),
-                    Size = new Vector2(_iconSize, _iconSize),
-                    Alignment = TextAlignment.CENTER,
-                };
-                frame.Add(groupIcon);
+                frame.Add(
+                    new MySprite()
+                    {
+                        Type = SpriteType.TEXTURE,
+                        Data = plots[0].PlantId,
+                        Position = CreatePosition(iconX, iconY),
+                        Size = new Vector2(_iconSize, _iconSize),
+                        Alignment = TextAlignment.CENTER,
+                    }
+                );
             }
         }
 
@@ -594,32 +596,34 @@ namespace IngameScript
             var growthYOffet = (_waterRectHeight + _plotPadding) / 2;
 
             // Draw outline rectangle with state-based color
-            var outline = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = CreatePosition(x, y),
-                Size = new Vector2(_rectWidth, RectHeight),
-                Color = outlineColor,
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(outline);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Position = CreatePosition(x, y),
+                    Size = new Vector2(_rectWidth, RectHeight),
+                    Color = outlineColor,
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
 
             // Draw black background for growth section
             // Available height = GrowthRectHeight - 2x padding (top and bottom)
             float growthAvailableHeight = _growthRectHeight - (2 * _plotPadding);
             // Shift down by half padding to center the padded background within the outline
             float backgroundY = y - growthYOffet + (_plotPadding / 2);
-            var background = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = CreatePosition(x, backgroundY),
-                Size = new Vector2(_rectWidth - (2 * _plotPadding), growthAvailableHeight),
-                Color = _surface.ScriptBackgroundColor,
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(background);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Position = CreatePosition(x, backgroundY),
+                    Size = new Vector2(_rectWidth - (2 * _plotPadding), growthAvailableHeight),
+                    Color = _surface.ScriptBackgroundColor,
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
 
             float innerPadding = _plotPadding * 4;
 
@@ -630,16 +634,17 @@ namespace IngameScript
                 float filledHeight = (growthAvailableHeight - 2 * _plotPadding) * growthProgress;
                 float filledY = y + (_growthRectHeight - filledHeight - innerPadding) / 2;
 
-                var filled = new MySprite()
-                {
-                    Type = SpriteType.TEXTURE,
-                    Data = "SquareSimple",
-                    Position = CreatePosition(x, filledY - growthYOffet + (_plotPadding / 2)),
-                    Size = new Vector2(_rectWidth - innerPadding, filledHeight),
-                    Color = progressBarColor,
-                    Alignment = TextAlignment.CENTER,
-                };
-                frame.Add(filled);
+                frame.Add(
+                    new MySprite()
+                    {
+                        Type = SpriteType.TEXTURE,
+                        Data = "SquareSimple",
+                        Position = CreatePosition(x, filledY - growthYOffet + (_plotPadding / 2)),
+                        Size = new Vector2(_rectWidth - innerPadding, filledHeight),
+                        Color = progressBarColor,
+                        Alignment = TextAlignment.CENTER,
+                    }
+                );
             }
 
             // Draw water level indicator below the farm plot
@@ -650,16 +655,17 @@ namespace IngameScript
             float waterRectY = y + (RectHeight / 2) - (_waterRectHeight / 2) - _plotPadding / 2;
 
             // Water level background (black)
-            var waterBackground = new MySprite()
-            {
-                Type = SpriteType.TEXTURE,
-                Data = "SquareSimple",
-                Position = CreatePosition(x, waterRectY),
-                Size = new Vector2(_rectWidth - (2 * _plotPadding), waterAvailableHeight),
-                Color = _surface.ScriptBackgroundColor,
-                Alignment = TextAlignment.CENTER,
-            };
-            frame.Add(waterBackground);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "SquareSimple",
+                    Position = CreatePosition(x, waterRectY),
+                    Size = new Vector2(_rectWidth - (2 * _plotPadding), waterAvailableHeight),
+                    Color = _surface.ScriptBackgroundColor,
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
 
             // Water level fill bar (left to right)
             float waterRatio = (float)plot.WaterFilledRatio;
@@ -676,16 +682,17 @@ namespace IngameScript
                 float filledWidth = waterAvailableWidth * waterRatio;
                 float waterFilledX = x - (waterAvailableWidth / 2) + (filledWidth / 2);
 
-                var waterFilled = new MySprite()
-                {
-                    Type = SpriteType.TEXTURE,
-                    Data = "SquareSimple",
-                    Position = CreatePosition(waterFilledX, waterRectY),
-                    Size = new Vector2(filledWidth, waterAvailableHeight - (2 * _plotPadding)),
-                    Color = waterBarColor,
-                    Alignment = TextAlignment.CENTER,
-                };
-                frame.Add(waterFilled);
+                frame.Add(
+                    new MySprite()
+                    {
+                        Type = SpriteType.TEXTURE,
+                        Data = "SquareSimple",
+                        Position = CreatePosition(waterFilledX, waterRectY),
+                        Size = new Vector2(filledWidth, waterAvailableHeight - (2 * _plotPadding)),
+                        Color = waterBarColor,
+                        Alignment = TextAlignment.CENTER,
+                    }
+                );
             }
         }
 
@@ -711,20 +718,21 @@ namespace IngameScript
         private void DrawFooter(MySpriteDrawFrame frame)
         {
             string dimensionsText = $"{(int)_viewport.Width} x {(int)_viewport.Height}";
-            var dimensions = new MySprite()
-            {
-                Type = SpriteType.TEXT,
-                Data = dimensionsText,
-                Position = CreatePosition(
-                    _viewport.Width / 2f,
-                    _viewport.Height - _headerYPosition * 2f
-                ),
-                RotationOrScale = _headerTextScale,
-                Color = _surface.ScriptForegroundColor,
-                Alignment = TextAlignment.CENTER,
-                FontId = "White",
-            };
-            frame.Add(dimensions);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXT,
+                    Data = dimensionsText,
+                    Position = CreatePosition(
+                        _viewport.Width / 2f,
+                        _viewport.Height - _headerYPosition * 2f
+                    ),
+                    RotationOrScale = _headerTextScale,
+                    Color = _surface.ScriptForegroundColor,
+                    Alignment = TextAlignment.CENTER,
+                    FontId = "White",
+                }
+            );
         }
 
         /// <summary>
@@ -733,31 +741,36 @@ namespace IngameScript
         /// <param name="frame">The sprite frame to add the message to</param>
         private void DrawUnsupportedScreenMessage(MySpriteDrawFrame frame)
         {
-            var message = new MySprite()
-            {
-                Type = SpriteType.TEXT,
-                Data = "Screen Size Unsupported",
-                Position = CreatePosition(_viewport.Width / 2f, _spacing),
-                RotationOrScale = 0.7f,
-                Color = _surface.ScriptForegroundColor,
-                Alignment = TextAlignment.CENTER,
-                FontId = "White",
-            };
-            frame.Add(message);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXT,
+                    Data = "Screen Size Unsupported",
+                    Position = CreatePosition(_viewport.Width / 2f, _spacing),
+                    RotationOrScale = 0.7f,
+                    Color = _surface.ScriptForegroundColor,
+                    Alignment = TextAlignment.CENTER,
+                    FontId = "White",
+                }
+            );
 
             // Also show the dimensions below the message
             string dimensionsText = $"{(int)_viewport.Width} x {(int)_viewport.Height}";
-            var dimensions = new MySprite()
-            {
-                Type = SpriteType.TEXT,
-                Data = dimensionsText,
-                Position = CreatePosition(_viewport.Width / 2f, _viewport.Height - 20f - _spacing),
-                RotationOrScale = 0.5f,
-                Color = _surface.ScriptForegroundColor,
-                Alignment = TextAlignment.CENTER,
-                FontId = "White",
-            };
-            frame.Add(dimensions);
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXT,
+                    Data = dimensionsText,
+                    Position = CreatePosition(
+                        _viewport.Width / 2f,
+                        _viewport.Height - 20f - _spacing
+                    ),
+                    RotationOrScale = 0.5f,
+                    Color = _surface.ScriptForegroundColor,
+                    Alignment = TextAlignment.CENTER,
+                    FontId = "White",
+                }
+            );
         }
     }
 }
