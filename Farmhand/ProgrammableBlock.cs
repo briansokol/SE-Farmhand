@@ -304,15 +304,22 @@ namespace IngameScript
         /// Writes text to the terminal and appends it to the internal buffer
         /// </summary>
         /// <param name="text">Text to display</param>
+        /// <param name="header">Whether to format the text as a header</param>
         /// <summary>
         /// Appends text to the internal buffer for display on the programmable block's LCD
         /// </summary>
-        /// <param name="text">Text to append</param>
-        public void AppendText(string text)
+        public void AppendText(string text, bool header = false)
         {
             if (IsFunctional() && _lcdScreen != null)
             {
-                _lcdOutput.AppendLine(text);
+                if (header)
+                {
+                    _lcdOutput.AppendLine(text);
+                }
+                else
+                {
+                    _lcdOutput.AppendLine("  " + text);
+                }
             }
         }
 

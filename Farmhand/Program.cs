@@ -176,8 +176,8 @@ namespace IngameScript
                 runNumber += 1;
             }
 
-            WriteToDiagnosticOutput(header);
-            WriteToDiagnosticOutput($"{Version} | ({PublishedDate})");
+            WriteToDiagnosticOutput(header, true);
+            WriteToDiagnosticOutput($"{Version} | ({PublishedDate})", true);
             WriteToDiagnosticOutput("");
 
             // Print diagnostic info once per cycle
@@ -185,7 +185,7 @@ namespace IngameScript
                 .GetAllGroups()
                 .ForEach(farmGroup =>
                 {
-                    WriteToDiagnosticOutput($"Group: {farmGroup.GroupName}");
+                    WriteToDiagnosticOutput($"Group: {farmGroup.GroupName}", true);
                     if (farmGroup.FarmPlots.Count > 0)
                     {
                         WriteToDiagnosticOutput($"Farm Plots: {farmGroup.FarmPlots.Count}");
@@ -765,9 +765,9 @@ namespace IngameScript
         /// Writes diagnostic text to the programmable block's LCD screen
         /// </summary>
         /// <param name="text">Diagnostic text to display</param>
-        void WriteToDiagnosticOutput(string text)
+        void WriteToDiagnosticOutput(string text, bool header = false)
         {
-            thisPb.AppendText(text);
+            thisPb.AppendText(text, header);
         }
 
         string GetHeaderAnimation(int runNumber)
