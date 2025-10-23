@@ -7,17 +7,21 @@ namespace IngameScript
 {
     /// <summary>
     /// Provides sprite-based rendering for PlotLCD displays (512x73 resolution)
+    /// Supports split display for showing two farm plots side-by-side
     /// </summary>
     internal class PlotLCDRenderer
     {
         // Layout constants for 512x73 display
         private const int PADDING = 3;
         private const int WATER_BAR_WIDTH = 30;
+        private const int WATER_BAR_WIDTH_HALF = 15; // Half width for split display
         private const int ICON_SIZE = 67; // Fills vertical space (73 - 6px padding = 67)
         private const int BAR_PADDING = 2; // Padding around progress bars
+        private const int CENTER_PADDING = 2; // Padding between left and right displays
 
         private readonly IMyTextSurface _surface;
-        private readonly FarmPlot _farmPlot;
+        private readonly FarmPlot _leftFarmPlot;
+        private readonly FarmPlot _rightFarmPlot;
         private readonly int _runNumber;
         private readonly ProgrammableBlock _programmableBlock;
         private readonly RectangleF _viewport;
@@ -30,20 +34,23 @@ namespace IngameScript
         /// Initializes a new PlotLCDRenderer for the specified surface
         /// </summary>
         /// <param name="surface">The text surface to draw on (512x73 LCD panel)</param>
-        /// <param name="farmPlot">The farm plot to display (null if not found)</param>
+        /// <param name="leftFarmPlot">The farm plot to display on the left side (null if not found)</param>
+        /// <param name="rightFarmPlot">The farm plot to display on the right side (null if not found)</param>
         /// <param name="runNumber">Animation frame number for blinking effects (0-5)</param>
         /// <param name="programmableBlock">Reference to programmable block for color configuration</param>
         /// <param name="shiftSprites">Whether to shift sprites for redraw on server clients</param>
         public PlotLCDRenderer(
             IMyTextSurface surface,
-            FarmPlot farmPlot,
+            FarmPlot leftFarmPlot,
+            FarmPlot rightFarmPlot,
             int runNumber,
             ProgrammableBlock programmableBlock,
             bool shiftSprites = false
         )
         {
             _surface = surface;
-            _farmPlot = farmPlot;
+            _leftFarmPlot = leftFarmPlot;
+            _rightFarmPlot = rightFarmPlot;
             _runNumber = runNumber;
             _programmableBlock = programmableBlock;
             _shiftSprites = shiftSprites;
@@ -56,18 +63,41 @@ namespace IngameScript
 
         /// <summary>
         /// Draws the plot status display (or "Farm Plot Not Found" message)
+        /// Supports split display when multiple plots are present
         /// </summary>
         public void DrawPlotStatus()
         {
             using (var frame = _surface.DrawFrame())
             {
-                if (_farmPlot == null)
+                // Shift sprite array every other render to force redraw on server clients
+                if (_shiftSprites)
+                {
+                    frame.Add(new MySprite());
+                }
+
+                // Determine display mode based on which plots exist
+                bool hasLeftPlot = _leftFarmPlot != null;
+                bool hasRightPlot = _rightFarmPlot != null;
+
+                if (!hasLeftPlot && !hasRightPlot)
                 {
                     DrawNotFoundMessage(frame);
                 }
+                else if (hasLeftPlot && hasRightPlot)
+                {
+                    // Draw both plots in split display
+                    DrawHalfPlotDisplay(frame, _leftFarmPlot, true);
+                    DrawHalfPlotDisplay(frame, _rightFarmPlot, false);
+                }
+                else if (hasLeftPlot)
+                {
+                    // Draw only left plot
+                    DrawHalfPlotDisplay(frame, _leftFarmPlot, true);
+                }
                 else
                 {
-                    DrawPlotDisplay(frame);
+                    // Draw only right plot
+                    DrawHalfPlotDisplay(frame, _rightFarmPlot, false);
                 }
             }
         }
@@ -92,49 +122,58 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Draws the complete plot display with icon, water bar, and growth bar
+        /// Draws a half-width plot display for split display mode
         /// </summary>
-        private void DrawPlotDisplay(MySpriteDrawFrame frame)
+        /// <param name="frame">The sprite draw frame</param>
+        /// <param name="farmPlot">The farm plot to display</param>
+        /// <param name="isLeftSide">True for left side, false for right side</param>
+        private void DrawHalfPlotDisplay(
+            MySpriteDrawFrame frame,
+            FarmPlot farmPlot,
+            bool isLeftSide
+        )
         {
-            // Shift sprite array every other render to force redraw on server clients
-            if (_shiftSprites)
-            {
-                frame.Add(new MySprite());
-            }
+            // Calculate half-width bounds
+            // Total width: 512px, center padding: 2px
+            // Left side: 0-255px (255px width)
+            // Right side: 257-512px (255px width)
+            float halfWidth = (_viewport.Width - CENTER_PADDING) / 2f;
+            float startX = isLeftSide ? 0f : (halfWidth + CENTER_PADDING);
 
             // Calculate usable area (after padding)
-            float usableWidth = _viewport.Width - (2 * PADDING);
+            float usableWidth = halfWidth - (2 * PADDING);
             float usableHeight = _viewport.Height - (2 * PADDING);
 
             // Calculate positions (all elements vertically centered)
             float centerY = _viewport.Height / 2f;
 
-            // Icon on the left
-            float iconX = PADDING + (ICON_SIZE / 2f);
+            // Icon on the left of the half-display
+            float iconX = startX + PADDING + (ICON_SIZE / 2f);
             float iconY = centerY;
 
-            // Water bar next to icon
-            float waterBarX = PADDING + ICON_SIZE + (WATER_BAR_WIDTH / 2f);
+            // Water bar next to icon (half width)
+            float waterBarX = startX + PADDING + ICON_SIZE + (WATER_BAR_WIDTH_HALF / 2f);
             float waterBarY = centerY;
 
-            // Growth bar fills remaining space
-            float remainingWidth = usableWidth - ICON_SIZE - WATER_BAR_WIDTH;
+            // Growth bar fills remaining space in this half
+            float remainingWidth = usableWidth - ICON_SIZE - WATER_BAR_WIDTH_HALF;
             float growthBarWidth = remainingWidth;
-            float growthBarX = PADDING + ICON_SIZE + WATER_BAR_WIDTH + (growthBarWidth / 2f);
+            float growthBarX =
+                startX + PADDING + ICON_SIZE + WATER_BAR_WIDTH_HALF + (growthBarWidth / 2f);
             float growthBarY = centerY;
 
             // Determine if this is an alternate frame for blinking (odd frames: 1, 3, 5)
             bool isAlternateFrame = (_runNumber % 2) == 1;
 
             // Get colors for the plot
-            Color outlineColor = GetPlotColor(_farmPlot, isAlternateFrame);
-            Color progressBarColor = GetProgressBarColor(_farmPlot, isAlternateFrame);
+            Color outlineColor = GetPlotColor(farmPlot, isAlternateFrame);
+            Color progressBarColor = GetProgressBarColor(farmPlot, isAlternateFrame);
 
             // Get growth progress
             float growthProgress = 0f;
-            if (_farmPlot.IsPlantPlanted && _farmPlot.IsPlantAlive)
+            if (farmPlot.IsPlantPlanted && farmPlot.IsPlantAlive)
             {
-                var details = _farmPlot.GetPlotDetails();
+                var details = farmPlot.GetPlotDetails();
                 if (details != null)
                 {
                     growthProgress = details.GrowthProgress;
@@ -142,13 +181,21 @@ namespace IngameScript
             }
 
             // Draw plant icon
-            if (_farmPlot.IsPlantPlanted)
+            if (farmPlot.IsPlantPlanted)
             {
-                DrawPlantIcon(frame, iconX, iconY);
+                DrawPlantIcon(frame, iconX, iconY, farmPlot);
             }
 
             // Draw water bar (vertical)
-            DrawWaterBar(frame, waterBarX, waterBarY, usableHeight, outlineColor);
+            DrawWaterBar(
+                frame,
+                waterBarX,
+                waterBarY,
+                usableHeight,
+                outlineColor,
+                farmPlot,
+                WATER_BAR_WIDTH_HALF
+            );
 
             // Draw growth bar (horizontal)
             DrawGrowthBar(
@@ -166,13 +213,13 @@ namespace IngameScript
         /// <summary>
         /// Draws the plant icon texture
         /// </summary>
-        private void DrawPlantIcon(MySpriteDrawFrame frame, float x, float y)
+        private void DrawPlantIcon(MySpriteDrawFrame frame, float x, float y, FarmPlot farmPlot)
         {
             frame.Add(
                 new MySprite()
                 {
                     Type = SpriteType.TEXTURE,
-                    Data = _farmPlot.PlantId,
+                    Data = farmPlot.PlantId,
                     Position = CreatePosition(x, y),
                     Size = new Vector2(ICON_SIZE, ICON_SIZE),
                     Alignment = TextAlignment.CENTER,
@@ -188,7 +235,9 @@ namespace IngameScript
             float x,
             float y,
             float barHeight,
-            Color outlineColor
+            Color outlineColor,
+            FarmPlot farmPlot,
+            int waterBarWidth
         )
         {
             // Layer 1: Colored background (outline)
@@ -198,14 +247,14 @@ namespace IngameScript
                     Type = SpriteType.TEXTURE,
                     Data = "SquareSimple",
                     Position = CreatePosition(x, y),
-                    Size = new Vector2(WATER_BAR_WIDTH, barHeight),
+                    Size = new Vector2(waterBarWidth, barHeight),
                     Color = outlineColor,
                     Alignment = TextAlignment.CENTER,
                 }
             );
 
             // Layer 2: Black background (1px smaller on all sides)
-            float blackWidth = WATER_BAR_WIDTH - (2 * BAR_PADDING);
+            float blackWidth = waterBarWidth - (2 * BAR_PADDING);
             float blackHeight = barHeight - (2 * BAR_PADDING);
             frame.Add(
                 new MySprite()
@@ -220,11 +269,11 @@ namespace IngameScript
             );
 
             // Layer 3: Water fill (grows from bottom, 1px padding from black background)
-            float waterRatio = (float)_farmPlot.WaterFilledRatio;
+            float waterRatio = (float)farmPlot.WaterFilledRatio;
             if (waterRatio > 0f)
             {
                 // Determine water bar fill color
-                Color waterBarColor = GetWaterBarColor();
+                Color waterBarColor = GetWaterBarColor(farmPlot);
 
                 float fillWidth = blackWidth - (2 * BAR_PADDING);
                 float fillMaxHeight = blackHeight - (2 * BAR_PADDING);
@@ -324,7 +373,7 @@ namespace IngameScript
         /// <summary>
         /// Determines the appropriate color for the water bar fill
         /// </summary>
-        private Color GetWaterBarColor()
+        private Color GetWaterBarColor(FarmPlot farmPlot)
         {
             if (_programmableBlock == null)
             {
@@ -332,13 +381,13 @@ namespace IngameScript
             }
 
             // Water bar shows water warning or base plant status
-            if (_farmPlot.WaterFilledRatio <= _programmableBlock.WaterLowThreshold)
+            if (farmPlot.WaterFilledRatio <= _programmableBlock.WaterLowThreshold)
             {
                 return _programmableBlock.WaterLowColor;
             }
             else
             {
-                return GetPlotColor(_farmPlot, false); // Base plant color (no blinking)
+                return GetPlotColor(farmPlot, false); // Base plant color (no blinking)
             }
         }
 
