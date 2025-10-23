@@ -115,7 +115,7 @@ namespace IngameScript
         /// <summary>
         /// Gets the group name from custom data
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The configured group name</returns>
         public string GroupName()
         {
             ParseCustomData();

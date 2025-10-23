@@ -301,13 +301,10 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Writes text to the terminal and appends it to the internal buffer
+        /// Appends text to the internal buffer for display on the programmable block's LCD
         /// </summary>
         /// <param name="text">Text to display</param>
         /// <param name="header">Whether to format the text as a header</param>
-        /// <summary>
-        /// Appends text to the internal buffer for display on the programmable block's LCD
-        /// </summary>
         public void AppendText(string text, bool header = false)
         {
             if (IsFunctional() && _lcdScreen != null)
@@ -323,9 +320,6 @@ namespace IngameScript
             }
         }
 
-        /// <summary>
-        /// Flushes the accumulated text to the LCD panel and clears the buffer
-        /// </summary>
         /// <summary>
         /// Flushes the accumulated text to the programmable block's LCD and clears the buffer
         /// </summary>
