@@ -15,6 +15,9 @@ namespace IngameScript
         protected readonly StringBuilder _lcdOutput = new StringBuilder();
         private FarmGroup _farmGroup;
 
+        // Used to force redraw of sprites on server clients
+        private readonly bool _shiftSprites;
+
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
             CustomDataConfig
@@ -84,10 +87,12 @@ namespace IngameScript
         /// </summary>
         /// <param name="lcdPanel">The Space Engineers text panel block to wrap</param>
         /// <param name="program">The parent grid program instance</param>
-        public LcdPanel(IMyTextPanel lcdPanel, MyGridProgram program)
+        /// <param name="shiftSprites">Whether to shift sprites for redraw on server clients</param>
+        public LcdPanel(IMyTextPanel lcdPanel, MyGridProgram program, bool shiftSprites)
             : base(program)
         {
             _lcdPanel = lcdPanel;
+            _shiftSprites = shiftSprites;
             UpdateCustomData();
         }
 
@@ -238,7 +243,7 @@ namespace IngameScript
         {
             if (IsFunctional() && _lcdPanel != null && IsGraphicalMode())
             {
-                var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle());
+                var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle(), _shiftSprites);
                 renderer.DrawGraphicalUI();
             }
         }

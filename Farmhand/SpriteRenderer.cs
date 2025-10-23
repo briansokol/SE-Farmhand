@@ -48,8 +48,6 @@ namespace IngameScript
     /// </summary>
     internal class SpriteRenderer
     {
-        private const bool DEBUG = false;
-
         // Instance fields
         private readonly IMyTextSurface _surface;
         private readonly FarmGroup _farmGroup;
@@ -75,17 +73,27 @@ namespace IngameScript
         // Computed property: Total rect height is growth + water
         private int RectHeight => _growthRectHeight + _waterRectHeight;
 
+        // Used to force redraw of sprites on server clients
+        private readonly bool _shiftSprites;
+
         /// <summary>
         /// Initializes a new SpriteRenderer for the specified surface and farm group
         /// </summary>
         /// <param name="surface">The text surface to draw on (LCD panel or cockpit screen)</param>
         /// <param name="farmGroup">Farm group containing farm plots to display</param>
         /// <param name="customTitle">Optional custom title text (defaults to empty string)</param>
-        public SpriteRenderer(IMyTextSurface surface, FarmGroup farmGroup, string customTitle = "")
+        /// <param name="shiftSprites">Whether to shift sprites for redraw on server clients</param>
+        public SpriteRenderer(
+            IMyTextSurface surface,
+            FarmGroup farmGroup,
+            string customTitle = "",
+            bool shiftSprites = false
+        )
         {
             _surface = surface;
             _farmGroup = farmGroup;
             _customTitle = customTitle;
+            _shiftSprites = shiftSprites;
             _textureSize = _surface.TextureSize;
             _viewport = new RectangleF(
                 (_textureSize - _surface.SurfaceSize) / 2f,
@@ -150,7 +158,15 @@ namespace IngameScript
             }
 
             // 512x512 - Square LCD panel
-            if (width == 512 && height == 512)
+            // 512x1024 - Rotated Wide LCD panel
+            // 512x362 - Sloped LCD panel
+            // 362x512 - Rotated Sloped LCD panel
+            if (
+                (width == 512 && height == 512)
+                || (width == 512 && height == 1024)
+                || (width == 512 && height == 362)
+                || (width == 362 && height == 512)
+            )
             {
                 return new ScreenLayout
                 {
@@ -168,17 +184,18 @@ namespace IngameScript
             }
 
             // 512x307 - Small LCD/Text panel
-            if (width == 512 && height == 307)
+            // 307x512 - Rotated Small LCD/Text panel
+            if ((width == 512 && height == 307) || (width == 307 && height == 512))
             {
                 return new ScreenLayout
                 {
-                    Spacing = 4,
+                    Spacing = 3,
                     HeaderFontHeight = 18,
                     HeaderTextScale = 0.7f,
-                    IconSize = 44,
+                    IconSize = 42,
                     WaterRectHeight = 8,
-                    GrowthRectHeight = 36,
-                    RectWidth = 26,
+                    GrowthRectHeight = 37,
+                    RectWidth = 30,
                     LeftMargin = 6,
                     PlotPadding = 2,
                     IsSupported = true,
@@ -237,6 +254,12 @@ namespace IngameScript
 
             using (var frame = _surface.DrawFrame())
             {
+                // Shift sprite array every other render to force redraw on server clients
+                if (_shiftSprites)
+                {
+                    frame.Add(new MySprite());
+                }
+
                 // Draw header and footer
                 DrawHeader(frame);
 
@@ -588,7 +611,7 @@ namespace IngameScript
                 }
             );
 
-            // Draw black background for growth section
+            // Draw background for growth section
             // Available height = GrowthRectHeight - 2x padding (top and bottom)
             float growthAvailableHeight = _growthRectHeight - (2 * _plotPadding);
             // Shift down by half padding to center the padded background within the outline
@@ -635,7 +658,7 @@ namespace IngameScript
             // Vertical position for water rectangle
             float waterRectY = y + (RectHeight / 2) - (_waterRectHeight / 2) - _plotPadding / 2;
 
-            // Water level background (black)
+            // Water level background
             frame.Add(
                 new MySprite()
                 {

@@ -23,6 +23,9 @@ namespace IngameScript
         public override IMyTerminalBlock BlockInstance => _lcdPanel;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs => null;
 
+        // Used to force redraw of sprites on server clients
+        private readonly bool _shiftSprites;
+
         /// <summary>
         /// Gets whether this LCD has the correct resolution (512x73)
         /// </summary>
@@ -38,11 +41,13 @@ namespace IngameScript
         /// </summary>
         /// <param name="lcdPanel">The Space Engineers text panel block to wrap</param>
         /// <param name="program">The parent grid program instance</param>
-        public PlotLCD(IMyTextPanel lcdPanel, MyGridProgram program)
+        /// <param name="shiftSprites">Whether to shift sprites for redraw on server clients</param>
+        public PlotLCD(IMyTextPanel lcdPanel, MyGridProgram program, bool shiftSprites)
             : base(program)
         {
             _lcdPanel = lcdPanel;
             _gridProgram = program;
+            _shiftSprites = shiftSprites;
             CheckResolution();
         }
 
@@ -161,7 +166,8 @@ namespace IngameScript
                     _lcdPanel,
                     _nearbyFarmPlot,
                     runNumber,
-                    programmableBlock
+                    programmableBlock,
+                    _shiftSprites
                 );
                 renderer.DrawPlotStatus();
             }

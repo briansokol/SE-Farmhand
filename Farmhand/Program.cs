@@ -17,8 +17,8 @@ namespace IngameScript
         readonly string plotLcdTag = "PlotLCD";
         readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
-        readonly string Version = "v0.9.0";
-        readonly string PublishedDate = "2025-10-22";
+        readonly string Version = "v0.9.1";
+        readonly string PublishedDate = "2025-10-23";
 
         // Step-based state machine management
         delegate void Step();
@@ -26,6 +26,8 @@ namespace IngameScript
         int currentStepIndex = 0;
         double currentCycleTime = 0;
         double lastCycleTime = 0;
+
+        bool shiftSprites = false;
 
         public Program()
         {
@@ -158,6 +160,8 @@ namespace IngameScript
             {
                 stepQueue.Add(RenderPlotLCDs);
             }
+
+            shiftSprites = !shiftSprites;
         }
 
         /// <summary>
@@ -259,11 +263,11 @@ namespace IngameScript
             {
                 if (Cockpit.BlockIsValid(block))
                 {
-                    cockpits.Add(new Cockpit(block as IMyCockpit, this));
+                    cockpits.Add(new Cockpit(block as IMyCockpit, this, shiftSprites));
                 }
                 else if (LcdPanel.BlockIsValid(block as IMyFunctionalBlock))
                 {
-                    lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this));
+                    lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this, shiftSprites));
                 }
             });
 
@@ -322,7 +326,7 @@ namespace IngameScript
             {
                 if (PlotLCD.BlockIsValid(block))
                 {
-                    var plotLcd = new PlotLCD(block as IMyTextPanel, this);
+                    var plotLcd = new PlotLCD(block as IMyTextPanel, this, shiftSprites);
                     plotLcds.Add(plotLcd);
 
                     // Find nearby farm plot (only if resolution is correct)

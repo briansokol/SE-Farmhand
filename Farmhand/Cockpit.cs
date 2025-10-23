@@ -17,6 +17,9 @@ namespace IngameScript
         protected readonly List<StringBuilder> _lcdOutput = new List<StringBuilder>();
         private FarmGroup _farmGroup;
 
+        // Used to force redraw of sprites on server clients
+        private readonly bool _shiftSprites;
+
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
             CustomDataConfig
@@ -101,13 +104,15 @@ namespace IngameScript
         /// </summary>
         /// <param name="cockpit">The Space Engineers cockpit block to wrap</param>
         /// <param name="program">The parent grid program instance</param>
-        public Cockpit(IMyCockpit cockpit, MyGridProgram program)
+        /// <param name="shiftSprites">Whether to shift sprites for redraw on server clients</param>
+        public Cockpit(IMyCockpit cockpit, MyGridProgram program, bool shiftSprites)
             : base(program)
         {
             _cockpit = cockpit;
             for (int i = 0; i < _cockpit.SurfaceCount; i++)
             {
                 _lcdOutput.Add(new StringBuilder());
+                _shiftSprites = shiftSprites;
             }
             UpdateCustomData();
         }
@@ -302,7 +307,7 @@ namespace IngameScript
         private void DrawGraphicalUI(int screenIndex)
         {
             var screen = _cockpit.GetSurface(screenIndex);
-            var renderer = new SpriteRenderer(screen, _farmGroup, GetTitle());
+            var renderer = new SpriteRenderer(screen, _farmGroup, GetTitle(), _shiftSprites);
             renderer.DrawGraphicalUI();
         }
 

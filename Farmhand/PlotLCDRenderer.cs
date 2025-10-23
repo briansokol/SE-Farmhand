@@ -23,6 +23,9 @@ namespace IngameScript
         private readonly RectangleF _viewport;
         private readonly Vector2 _textureSize;
 
+        // Used to force redraw of sprites on server clients
+        private readonly bool _shiftSprites;
+
         /// <summary>
         /// Initializes a new PlotLCDRenderer for the specified surface
         /// </summary>
@@ -30,17 +33,20 @@ namespace IngameScript
         /// <param name="farmPlot">The farm plot to display (null if not found)</param>
         /// <param name="runNumber">Animation frame number for blinking effects (0-5)</param>
         /// <param name="programmableBlock">Reference to programmable block for color configuration</param>
+        /// <param name="shiftSprites">Whether to shift sprites for redraw on server clients</param>
         public PlotLCDRenderer(
             IMyTextSurface surface,
             FarmPlot farmPlot,
             int runNumber,
-            ProgrammableBlock programmableBlock
+            ProgrammableBlock programmableBlock,
+            bool shiftSprites = false
         )
         {
             _surface = surface;
             _farmPlot = farmPlot;
             _runNumber = runNumber;
             _programmableBlock = programmableBlock;
+            _shiftSprites = shiftSprites;
             _textureSize = _surface.TextureSize;
             _viewport = new RectangleF(
                 (_textureSize - _surface.SurfaceSize) / 2f,
@@ -90,6 +96,12 @@ namespace IngameScript
         /// </summary>
         private void DrawPlotDisplay(MySpriteDrawFrame frame)
         {
+            // Shift sprite array every other render to force redraw on server clients
+            if (_shiftSprites)
+            {
+                frame.Add(new MySprite());
+            }
+
             // Calculate usable area (after padding)
             float usableWidth = _viewport.Width - (2 * PADDING);
             float usableHeight = _viewport.Height - (2 * PADDING);
