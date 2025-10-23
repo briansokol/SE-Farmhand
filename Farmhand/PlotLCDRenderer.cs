@@ -17,7 +17,7 @@ namespace IngameScript
         private const int WATER_BAR_WIDTH_HALF = 15; // Half width for split display
         private const int ICON_SIZE = 67; // Fills vertical space (73 - 6px padding = 67)
         private const int BAR_PADDING = 2; // Padding around progress bars
-        private const int CENTER_PADDING = 2; // Padding between left and right displays
+        private const int CENTER_PADDING = 0; // Padding between left and right displays
 
         private readonly IMyTextSurface _surface;
         private readonly FarmPlot _leftFarmPlot;
@@ -91,13 +91,13 @@ namespace IngameScript
                 }
                 else if (hasLeftPlot)
                 {
-                    // Draw only left plot
-                    DrawHalfPlotDisplay(frame, _leftFarmPlot, true);
+                    // Draw only left plot in full display
+                    DrawFullPlotDisplay(frame, _leftFarmPlot);
                 }
                 else
                 {
-                    // Draw only right plot
-                    DrawHalfPlotDisplay(frame, _rightFarmPlot, false);
+                    // Draw only right plot in full display
+                    DrawFullPlotDisplay(frame, _rightFarmPlot);
                 }
             }
         }
@@ -180,10 +180,14 @@ namespace IngameScript
                 }
             }
 
-            // Draw plant icon
+            // Draw plant icon or circle for empty plots
             if (farmPlot.IsPlantPlanted)
             {
                 DrawPlantIcon(frame, iconX, iconY, farmPlot);
+            }
+            else
+            {
+                DrawEmptyPlotIcon(frame, iconX, iconY);
             }
 
             // Draw water bar (vertical)
@@ -211,6 +215,86 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Draws a full-width plot display for single plot mode
+        /// </summary>
+        /// <param name="frame">The sprite draw frame</param>
+        /// <param name="farmPlot">The farm plot to display</param>
+        private void DrawFullPlotDisplay(MySpriteDrawFrame frame, FarmPlot farmPlot)
+        {
+            // Calculate usable area (after padding)
+            float usableWidth = _viewport.Width - (2 * PADDING);
+            float usableHeight = _viewport.Height - (2 * PADDING);
+
+            // Calculate positions (all elements vertically centered)
+            float centerY = _viewport.Height / 2f;
+
+            // Icon on the left
+            float iconX = PADDING + (ICON_SIZE / 2f);
+            float iconY = centerY;
+
+            // Water bar next to icon (full width)
+            float waterBarX = PADDING + ICON_SIZE + (WATER_BAR_WIDTH / 2f);
+            float waterBarY = centerY;
+
+            // Growth bar fills remaining space
+            float remainingWidth = usableWidth - ICON_SIZE - WATER_BAR_WIDTH;
+            float growthBarWidth = remainingWidth;
+            float growthBarX = PADDING + ICON_SIZE + WATER_BAR_WIDTH + (growthBarWidth / 2f);
+            float growthBarY = centerY;
+
+            // Determine if this is an alternate frame for blinking (odd frames: 1, 3, 5)
+            bool isAlternateFrame = (_runNumber % 2) == 1;
+
+            // Get colors for the plot
+            Color outlineColor = GetPlotColor(farmPlot, isAlternateFrame);
+            Color progressBarColor = GetProgressBarColor(farmPlot, isAlternateFrame);
+
+            // Get growth progress
+            float growthProgress = 0f;
+            if (farmPlot.IsPlantPlanted && farmPlot.IsPlantAlive)
+            {
+                var details = farmPlot.GetPlotDetails();
+                if (details != null)
+                {
+                    growthProgress = details.GrowthProgress;
+                }
+            }
+
+            // Draw plant icon or circle for empty plots
+            if (farmPlot.IsPlantPlanted)
+            {
+                DrawPlantIcon(frame, iconX, iconY, farmPlot);
+            }
+            else
+            {
+                DrawEmptyPlotIcon(frame, iconX, iconY);
+            }
+
+            // Draw water bar (vertical) with full width
+            DrawWaterBar(
+                frame,
+                waterBarX,
+                waterBarY,
+                usableHeight,
+                outlineColor,
+                farmPlot,
+                WATER_BAR_WIDTH
+            );
+
+            // Draw growth bar (horizontal)
+            DrawGrowthBar(
+                frame,
+                growthBarX,
+                growthBarY,
+                growthBarWidth,
+                usableHeight,
+                growthProgress,
+                outlineColor,
+                progressBarColor
+            );
+        }
+
+        /// <summary>
         /// Draws the plant icon texture
         /// </summary>
         private void DrawPlantIcon(MySpriteDrawFrame frame, float x, float y, FarmPlot farmPlot)
@@ -222,6 +306,24 @@ namespace IngameScript
                     Data = farmPlot.PlantId,
                     Position = CreatePosition(x, y),
                     Size = new Vector2(ICON_SIZE, ICON_SIZE),
+                    Alignment = TextAlignment.CENTER,
+                }
+            );
+        }
+
+        /// <summary>
+        /// Draws a CircleHollow icon for empty plots
+        /// </summary>
+        private void DrawEmptyPlotIcon(MySpriteDrawFrame frame, float x, float y)
+        {
+            frame.Add(
+                new MySprite()
+                {
+                    Type = SpriteType.TEXTURE,
+                    Data = "Circle",
+                    Position = CreatePosition(x, y),
+                    Size = new Vector2(ICON_SIZE * 1 / 3, ICON_SIZE * 1 / 3),
+                    Color = _programmableBlock.PlanterEmptyColor,
                     Alignment = TextAlignment.CENTER,
                 }
             );

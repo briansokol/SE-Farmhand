@@ -103,6 +103,11 @@ namespace IngameScript
             var lcdPosition = _lcdPanel.Position;
             var orientation = _lcdPanel.Orientation;
 
+            // Corner LCD Top is upside down, so right and left are swapped
+            var isCornerLcdTop = _lcdPanel.BlockDefinition.SubtypeName.EndsWith(
+                "BlockCorner_LCD_1"
+            );
+
             // The corner LCDs are essentially laying on their face,
             // So we need to adjust our search directions accordingly.
             // Their down is forward and their forward is up.
@@ -110,7 +115,9 @@ namespace IngameScript
             // Get left and right vectors
             // Using left because the LCDs are rotated
             Base6Directions.Direction leftDir = orientation.Left;
-            Vector3I leftOffset = Base6Directions.GetIntVector(leftDir);
+            Vector3I leftOffset = isCornerLcdTop
+                ? -1 * Base6Directions.GetIntVector(leftDir)
+                : Base6Directions.GetIntVector(leftDir);
             Vector3I rightOffset = -leftOffset;
 
             // Check left position

@@ -495,10 +495,7 @@ namespace IngameScript
             var plots = group.ToList();
 
             // Draw group icon
-            if (!string.IsNullOrEmpty(plantType))
-            {
-                DrawGroupIcon(frame, columnStartX, currentY, plots);
-            }
+            DrawGroupIcon(frame, columnStartX, currentY, plots);
 
             // Calculate if this is an alternate frame for blinking (odd frames: 1, 3, 5)
             bool isAlternateFrame = (_farmGroup.RunNumber % 2) == 1;
@@ -561,21 +558,38 @@ namespace IngameScript
             List<FarmPlot> plots
         )
         {
-            if (plots.Count > 0 && plots[0].IsPlantPlanted)
+            if (plots.Count > 0)
             {
                 float iconX = columnStartX + (_iconSize / 2);
                 float iconY = currentY;
 
-                frame.Add(
-                    new MySprite()
-                    {
-                        Type = SpriteType.TEXTURE,
-                        Data = plots[0].PlantId,
-                        Position = CreatePosition(iconX, iconY),
-                        Size = new Vector2(_iconSize, _iconSize),
-                        Alignment = TextAlignment.CENTER,
-                    }
-                );
+                if (plots[0].IsPlantPlanted)
+                {
+                    frame.Add(
+                        new MySprite()
+                        {
+                            Type = SpriteType.TEXTURE,
+                            Data = plots[0].PlantId,
+                            Position = CreatePosition(iconX, iconY),
+                            Size = new Vector2(_iconSize, _iconSize),
+                            Alignment = TextAlignment.CENTER,
+                        }
+                    );
+                }
+                else
+                {
+                    frame.Add(
+                        new MySprite()
+                        {
+                            Type = SpriteType.TEXTURE,
+                            Data = "Circle",
+                            Position = CreatePosition(iconX + 1, iconY),
+                            Size = new Vector2(_iconSize * 1 / 3, _iconSize * 1 / 3),
+                            Color = _farmGroup.ProgrammableBlock.PlanterEmptyColor,
+                            Alignment = TextAlignment.CENTER,
+                        }
+                    );
+                }
             }
         }
 
