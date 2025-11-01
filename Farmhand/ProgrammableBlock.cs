@@ -16,6 +16,14 @@ namespace IngameScript
         private readonly IMyTextSurface _lcdScreen;
         protected readonly StringBuilder _lcdOutput = new StringBuilder();
 
+        // Cached color values to avoid repeated parsing
+        private Color? _cachedPlanterEmptyColor;
+        private Color? _cachedPlantedAliveColor;
+        private Color? _cachedPlantedReadyColor;
+        private Color? _cachedPlantedDeadColor;
+        private Color? _cachedWaterLowColor;
+        private string _lastCustomData;
+
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
             CustomDataConfig
@@ -126,82 +134,124 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Gets the color for empty farm plots
+        /// Checks if custom data has changed and invalidates color cache if needed
+        /// </summary>
+        private void CheckAndInvalidateColorCache()
+        {
+            string currentCustomData = BlockInstance.CustomData;
+            if (_lastCustomData != currentCustomData)
+            {
+                _lastCustomData = currentCustomData;
+                _cachedPlanterEmptyColor = null;
+                _cachedPlantedAliveColor = null;
+                _cachedPlantedReadyColor = null;
+                _cachedPlantedDeadColor = null;
+                _cachedWaterLowColor = null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the color for empty farm plots (cached)
         /// </summary>
         public Color PlanterEmptyColor
         {
             get
             {
-                ParseCustomData();
-                return ParseColor(
-                    _customData
-                        .Get(_customDataHeader, _customDataConfigs["PlanterEmptyColor"].Label)
-                        .ToString(_customDataConfigs["PlanterEmptyColor"].DefaultValue)
-                );
+                CheckAndInvalidateColorCache();
+                if (_cachedPlanterEmptyColor == null)
+                {
+                    ParseCustomData();
+                    _cachedPlanterEmptyColor = ParseColor(
+                        _customData
+                            .Get(_customDataHeader, _customDataConfigs["PlanterEmptyColor"].Label)
+                            .ToString(_customDataConfigs["PlanterEmptyColor"].DefaultValue)
+                    );
+                }
+                return _cachedPlanterEmptyColor.Value;
             }
         }
 
         /// <summary>
-        /// Gets the color for growing plants
+        /// Gets the color for growing plants (cached)
         /// </summary>
         public Color PlantedAliveColor
         {
             get
             {
-                ParseCustomData();
-                return ParseColor(
-                    _customData
-                        .Get(_customDataHeader, _customDataConfigs["PlantedAliveColor"].Label)
-                        .ToString(_customDataConfigs["PlantedAliveColor"].DefaultValue)
-                );
+                CheckAndInvalidateColorCache();
+                if (_cachedPlantedAliveColor == null)
+                {
+                    ParseCustomData();
+                    _cachedPlantedAliveColor = ParseColor(
+                        _customData
+                            .Get(_customDataHeader, _customDataConfigs["PlantedAliveColor"].Label)
+                            .ToString(_customDataConfigs["PlantedAliveColor"].DefaultValue)
+                    );
+                }
+                return _cachedPlantedAliveColor.Value;
             }
         }
 
         /// <summary>
-        /// Gets the color for ready-to-harvest plants
+        /// Gets the color for ready-to-harvest plants (cached)
         /// </summary>
         public Color PlantedReadyColor
         {
             get
             {
-                ParseCustomData();
-                return ParseColor(
-                    _customData
-                        .Get(_customDataHeader, _customDataConfigs["PlantedReadyColor"].Label)
-                        .ToString(_customDataConfigs["PlantedReadyColor"].DefaultValue)
-                );
+                CheckAndInvalidateColorCache();
+                if (_cachedPlantedReadyColor == null)
+                {
+                    ParseCustomData();
+                    _cachedPlantedReadyColor = ParseColor(
+                        _customData
+                            .Get(_customDataHeader, _customDataConfigs["PlantedReadyColor"].Label)
+                            .ToString(_customDataConfigs["PlantedReadyColor"].DefaultValue)
+                    );
+                }
+                return _cachedPlantedReadyColor.Value;
             }
         }
 
         /// <summary>
-        /// Gets the color for dead plants
+        /// Gets the color for dead plants (cached)
         /// </summary>
         public Color PlantedDeadColor
         {
             get
             {
-                ParseCustomData();
-                return ParseColor(
-                    _customData
-                        .Get(_customDataHeader, _customDataConfigs["PlantedDeadColor"].Label)
-                        .ToString(_customDataConfigs["PlantedDeadColor"].DefaultValue)
-                );
+                CheckAndInvalidateColorCache();
+                if (_cachedPlantedDeadColor == null)
+                {
+                    ParseCustomData();
+                    _cachedPlantedDeadColor = ParseColor(
+                        _customData
+                            .Get(_customDataHeader, _customDataConfigs["PlantedDeadColor"].Label)
+                            .ToString(_customDataConfigs["PlantedDeadColor"].DefaultValue)
+                    );
+                }
+                return _cachedPlantedDeadColor.Value;
             }
         }
 
         /// <summary>
-        /// Gets the color for low water warning
+        /// Gets the color for low water warning (cached)
         /// </summary>
         public Color WaterLowColor
         {
             get
             {
-                ParseCustomData();
-                return ParseColor(
-                    _customData
-                        .Get(_customDataHeader, _customDataConfigs["WaterLowColor"].Label)
-                        .ToString(_customDataConfigs["WaterLowColor"].DefaultValue)
-                );
+                CheckAndInvalidateColorCache();
+                if (_cachedWaterLowColor == null)
+                {
+                    ParseCustomData();
+                    _cachedWaterLowColor = ParseColor(
+                        _customData
+                            .Get(_customDataHeader, _customDataConfigs["WaterLowColor"].Label)
+                            .ToString(_customDataConfigs["WaterLowColor"].DefaultValue)
+                    );
+                }
+                return _cachedWaterLowColor.Value;
             }
         }
 
