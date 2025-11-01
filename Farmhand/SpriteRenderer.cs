@@ -33,17 +33,6 @@ namespace IngameScript
     }
 
     /// <summary>
-    /// Cached rendering state for a single plot to avoid redundant calculations
-    /// </summary>
-    internal struct PlotRenderState
-    {
-        public float GrowthProgress;
-        public Color OutlineColor;
-        public Color ProgressBarColor;
-        public Color WaterBarColor;
-    }
-
-    /// <summary>
     /// Provides sprite-based graphical rendering for text surfaces
     /// </summary>
     internal class SpriteRenderer
@@ -75,6 +64,10 @@ namespace IngameScript
 
         // Used to force redraw of sprites on server clients
         private readonly bool _shiftSprites;
+
+        // Cached layout to avoid recalculation when plot list hasn't changed
+        private List<LayoutRow> _cachedLayoutRows;
+        private int _cachedPlotCount = -1;
 
         /// <summary>
         /// Initializes a new SpriteRenderer for the specified surface and farm group
@@ -263,60 +256,8 @@ namespace IngameScript
                 // Draw header and footer
                 DrawHeader(frame);
 
-                // Group plots by PlantType, ordered by group size (largest first), empty plots last
-                var allGroups = _farmGroup.FarmPlots.GroupBy(p => p.PlantType).ToList();
-
-                var nonEmptyGroups = allGroups
-                    .Where(g => !string.IsNullOrEmpty(g.Key))
-                    .OrderByDescending(g => g.Count())
-                    .ToList();
-
-                var emptyGroups = allGroups.Where(g => string.IsNullOrEmpty(g.Key)).ToList();
-
-                var groupedPlots = nonEmptyGroups.Concat(emptyGroups).ToList();
-
-                // Pre-process groups into layout rows (pair small groups side-by-side)
-                var layoutRows = new List<LayoutRow>();
-                IGrouping<string, FarmPlot> pendingGroup = null;
-
-                foreach (var group in groupedPlots)
-                {
-                    bool isSmallGroup = group.Count() <= _halfScreenPlots;
-
-                    if (isSmallGroup)
-                    {
-                        if (pendingGroup == null)
-                        {
-                            // Save this small group as pending
-                            pendingGroup = group;
-                        }
-                        else
-                        {
-                            // Pair with pending group
-                            layoutRows.Add(
-                                new LayoutRow { LeftGroup = pendingGroup, RightGroup = group }
-                            );
-                            pendingGroup = null;
-                        }
-                    }
-                    else
-                    {
-                        // Large group gets its own row
-                        if (pendingGroup != null)
-                        {
-                            // Flush pending group first
-                            layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
-                            pendingGroup = null;
-                        }
-                        layoutRows.Add(new LayoutRow { LeftGroup = group });
-                    }
-                }
-
-                // Flush any remaining pending group
-                if (pendingGroup != null)
-                {
-                    layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
-                }
+                // Get or compute layout rows (cached when plot count hasn't changed)
+                var layoutRows = GetOrComputeLayoutRows();
 
                 // Start just below the header (with double spacing)
                 float currentY = RectHeight / 2 + _headerFontHeight + _spacing * 4;
@@ -361,119 +302,103 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Gets or computes the layout rows, caching the result when plot count hasn't changed
+        /// </summary>
+        /// <returns>List of layout rows for rendering</returns>
+        private List<LayoutRow> GetOrComputeLayoutRows()
+        {
+            int currentPlotCount = _farmGroup.FarmPlots.Count;
+
+            // Return cached layout if plot count hasn't changed
+            if (_cachedLayoutRows != null && _cachedPlotCount == currentPlotCount)
+            {
+                return _cachedLayoutRows;
+            }
+
+            // Recompute layout when plot count has changed
+            _cachedPlotCount = currentPlotCount;
+
+            // Group plots by PlantType, ordered by group size (largest first), empty plots last
+            var allGroups = _farmGroup.FarmPlots.GroupBy(p => p.PlantType).ToList();
+
+            var nonEmptyGroups = allGroups
+                .Where(g => !string.IsNullOrEmpty(g.Key))
+                .OrderByDescending(g => g.Count())
+                .ToList();
+
+            var emptyGroups = allGroups.Where(g => string.IsNullOrEmpty(g.Key)).ToList();
+
+            var groupedPlots = nonEmptyGroups.Concat(emptyGroups).ToList();
+
+            // Pre-process groups into layout rows (pair small groups side-by-side)
+            var layoutRows = new List<LayoutRow>();
+            IGrouping<string, FarmPlot> pendingGroup = null;
+
+            foreach (var group in groupedPlots)
+            {
+                bool isSmallGroup = group.Count() <= _halfScreenPlots;
+
+                if (isSmallGroup)
+                {
+                    if (pendingGroup == null)
+                    {
+                        // Save this small group as pending
+                        pendingGroup = group;
+                    }
+                    else
+                    {
+                        // Pair with pending group
+                        layoutRows.Add(
+                            new LayoutRow { LeftGroup = pendingGroup, RightGroup = group }
+                        );
+                        pendingGroup = null;
+                    }
+                }
+                else
+                {
+                    // Large group gets its own row
+                    if (pendingGroup != null)
+                    {
+                        // Flush pending group first
+                        layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
+                        pendingGroup = null;
+                    }
+                    layoutRows.Add(new LayoutRow { LeftGroup = group });
+                }
+            }
+
+            // Flush any remaining pending group
+            if (pendingGroup != null)
+            {
+                layoutRows.Add(new LayoutRow { LeftGroup = pendingGroup });
+            }
+
+            // Cache the computed layout
+            _cachedLayoutRows = layoutRows;
+            return layoutRows;
+        }
+
+        /// <summary>
         /// Calculates all rendering colors for a farm plot in a single pass to avoid redundant checks
         /// </summary>
         /// <param name="plot">The farm plot to evaluate</param>
         /// <param name="isAlternateFrame">Whether this is an alternate frame for blinking effects</param>
         /// <returns>PlotRenderState containing all colors and growth progress</returns>
-        private PlotRenderState CalculatePlotRenderState(FarmPlot plot, bool isAlternateFrame)
+        private RenderHelpers.PlotRenderState CalculatePlotRenderState(
+            FarmPlot plot,
+            bool isAlternateFrame
+        )
         {
-            var state = new PlotRenderState();
-
-            // Default colors if programmable block is not available
-            if (_farmGroup.ProgrammableBlock == null)
-            {
-                state.OutlineColor = Color.Green;
-                state.ProgressBarColor = Color.Green;
-                state.WaterBarColor = Color.Blue;
-                state.GrowthProgress = 0f;
-                return state;
-            }
-
             // Get plot details once for all checks
             var plotDetails = plot.GetPlotDetails();
 
-            // Calculate growth progress
-            if (plot.IsPlantPlanted && plot.IsPlantAlive && plotDetails != null)
-            {
-                state.GrowthProgress = plotDetails.GrowthProgress;
-            }
-
-            // Determine warning states
-            bool isLowHealth =
-                plot.IsPlantPlanted
-                && plot.IsPlantAlive
-                && plotDetails != null
-                && plotDetails.CropHealth < _farmGroup.ProgrammableBlock.HealthLowThreshold;
-
-            bool isLowWater =
-                plot.IsFunctional()
-                && plot.WaterFilledRatio <= _farmGroup.ProgrammableBlock.WaterLowThreshold
-                && !isLowHealth;
-
-            // Determine base plant status color
-            Color baseColor;
-            if (!plot.IsPlantPlanted)
-            {
-                baseColor = _farmGroup.ProgrammableBlock.PlanterEmptyColor;
-            }
-            else if (!plot.IsPlantAlive)
-            {
-                baseColor = _farmGroup.ProgrammableBlock.PlantedDeadColor;
-            }
-            else if (plot.IsPlantFullyGrown)
-            {
-                baseColor = _farmGroup.ProgrammableBlock.PlantedReadyColor;
-            }
-            else
-            {
-                baseColor = _farmGroup.ProgrammableBlock.PlantedAliveColor;
-            }
-
-            // Calculate outline color (blinks on low health or low water)
-            if (isLowHealth && isAlternateFrame)
-            {
-                state.OutlineColor = _farmGroup.ProgrammableBlock.PlantedDeadColor;
-            }
-            else if (isLowWater && isAlternateFrame)
-            {
-                state.OutlineColor = _farmGroup.ProgrammableBlock.WaterLowColor;
-            }
-            else
-            {
-                state.OutlineColor = baseColor;
-            }
-
-            // Calculate progress bar color
-            if (plot.IsPlantPlanted && plot.IsPlantAlive)
-            {
-                if (plot.IsPlantFullyGrown)
-                {
-                    // Ready plants always show ready color
-                    state.ProgressBarColor = _farmGroup.ProgrammableBlock.PlantedReadyColor;
-                }
-                else if (isLowHealth)
-                {
-                    // Low health shows dead color (solid, no blink)
-                    state.ProgressBarColor = _farmGroup.ProgrammableBlock.PlantedDeadColor;
-                }
-                else if (isLowWater && isAlternateFrame)
-                {
-                    // Low water blinks warning color
-                    state.ProgressBarColor = _farmGroup.ProgrammableBlock.WaterLowColor;
-                }
-                else
-                {
-                    // Normal growing
-                    state.ProgressBarColor = _farmGroup.ProgrammableBlock.PlantedAliveColor;
-                }
-            }
-            else
-            {
-                state.ProgressBarColor = baseColor;
-            }
-
-            // Calculate water bar color (always solid, no blinking)
-            if (plot.WaterFilledRatio <= _farmGroup.ProgrammableBlock.WaterLowThreshold)
-            {
-                state.WaterBarColor = _farmGroup.ProgrammableBlock.WaterLowColor;
-            }
-            else
-            {
-                state.WaterBarColor = baseColor;
-            }
-
-            return state;
+            // Use shared helper method for color calculation
+            return RenderHelpers.CalculatePlotRenderState(
+                plot,
+                plotDetails,
+                _farmGroup.ProgrammableBlock,
+                isAlternateFrame
+            );
         }
 
         /// <summary>
@@ -513,7 +438,10 @@ namespace IngameScript
                 float y = currentY + row * (RectHeight + _spacing * 2);
 
                 // Calculate all rendering state once for this plot
-                PlotRenderState renderState = CalculatePlotRenderState(plot, isAlternateFrame);
+                RenderHelpers.PlotRenderState renderState = CalculatePlotRenderState(
+                    plot,
+                    isAlternateFrame
+                );
 
                 DrawFarmPlot(frame, x, y, plot, renderState);
             }
@@ -529,7 +457,11 @@ namespace IngameScript
         private void DrawHeader(MySpriteDrawFrame frame)
         {
             var headerTitle = string.IsNullOrEmpty(_customTitle) ? "Farmhand" : _customTitle;
-            string headerText = GetHeaderAnimation(_farmGroup?.RunNumber ?? 0, headerTitle);
+            string headerText = RenderHelpers.GetHeaderAnimation(
+                _farmGroup?.RunNumber ?? 0,
+                headerTitle,
+                TextAlignment.CENTER
+            );
             frame.Add(
                 new MySprite()
                 {
@@ -606,7 +538,7 @@ namespace IngameScript
             float x,
             float y,
             FarmPlot plot,
-            PlotRenderState renderState
+            RenderHelpers.PlotRenderState renderState
         )
         {
             // Calculate vertical offset for growth section (half of water height + padding)
@@ -706,21 +638,6 @@ namespace IngameScript
                     }
                 );
             }
-        }
-
-        /// <summary>
-        /// Gets the animated header text based on run number
-        /// </summary>
-        /// <param name="runNumber">Current animation frame (0-5)</param>
-        /// <param name="title">The title text to display in the header (defaults to "Farmhand")</param>
-        /// <returns>Animated header string</returns>
-        private static string GetHeaderAnimation(int runNumber, string title = "Farmhand")
-        {
-            var animationStart = new[] { "––•", "–•–", "•––" };
-            var animationEnd = new[] { "•––", "–•–", "––•" };
-            var frameNumber = runNumber > 2 ? runNumber - 3 : runNumber;
-
-            return $"{animationStart[frameNumber % animationStart.Length]} {title} {animationEnd[frameNumber % animationEnd.Length]}";
         }
 
         /// <summary>

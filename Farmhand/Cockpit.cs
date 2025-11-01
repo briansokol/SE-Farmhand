@@ -123,10 +123,7 @@ namespace IngameScript
         /// <returns>The configured group name</returns>
         public string GroupName()
         {
-            ParseCustomData();
-            return _customData
-                .Get(_customDataHeader, _customDataConfigs["GroupName"].Label)
-                .ToString("");
+            return GetCustomDataString("GroupName", "");
         }
 
         /// <summary>
@@ -135,10 +132,7 @@ namespace IngameScript
         /// <returns>The title text, or empty string if not set</returns>
         private string GetTitle()
         {
-            ParseCustomData();
-            return _customData
-                .Get(_customDataHeader, _customDataConfigs["Title"].Label)
-                .ToString("");
+            return GetCustomDataString("Title", "");
         }
 
         /// <summary>
@@ -174,7 +168,11 @@ namespace IngameScript
                 {
                     var customTitle = GetTitle();
                     var headerTitle = string.IsNullOrEmpty(customTitle) ? text : customTitle;
-                    outputText = GetHeaderAnimation(runNumber, headerTitle);
+                    outputText = RenderHelpers.GetHeaderAnimation(
+                        runNumber,
+                        headerTitle,
+                        GetTextAlignment()
+                    );
                 }
                 // Add 2-space indentation for non-headers when left-aligned
                 else if (!isHeader && GetTextAlignment() == TextAlignment.LEFT)
@@ -367,28 +365,7 @@ namespace IngameScript
         /// <returns>True if the header should be displayed</returns>
         private bool ShouldShowHeader()
         {
-            ParseCustomData();
-            return _customData
-                .Get(_customDataHeader, _customDataConfigs["Header"].Label)
-                .ToBoolean(false);
-        }
-
-        /// <summary>
-        /// Generates the animated header text based on text alignment and animation frame
-        /// </summary>
-        /// <param name="runNumber">Animation frame number (0-2)</param>
-        /// <param name="title">The title text to display in the header (defaults to "Farmhand")</param>
-        /// <returns>Formatted header string with animation</returns>
-        private string GetHeaderAnimation(int runNumber, string title = "Farmhand")
-        {
-            var alignment = GetTextAlignment();
-            var animationStart = new[] { "––•", "–•–", "•––" };
-            var animationEnd = new[] { "•––", "–•–", "––•" };
-            var frameNumber = runNumber > 2 ? runNumber - 3 : runNumber;
-
-            return alignment == TextAlignment.CENTER
-                ? $"{animationStart[frameNumber % animationStart.Length]} {title} {animationEnd[frameNumber % animationEnd.Length]}"
-                : $"{title} {animationEnd[frameNumber % animationEnd.Length]}";
+            return GetCustomDataBool("Header", false);
         }
 
         /// <summary>

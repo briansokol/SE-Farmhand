@@ -115,5 +115,50 @@ namespace IngameScript
                 }
             }
         }
+
+        /// <summary>
+        /// Gets a string value from custom data by config key
+        /// </summary>
+        /// <param name="configKey">The key in CustomDataConfigs dictionary</param>
+        /// <param name="defaultValue">Default value if key not found</param>
+        /// <returns>The configured string value</returns>
+        protected string GetCustomDataString(string configKey, string defaultValue = "")
+        {
+            if (CustomDataConfigs == null || !CustomDataConfigs.ContainsKey(configKey))
+            {
+                return defaultValue;
+            }
+
+            ParseCustomData();
+            return _customData
+                .Get(_customDataHeader, CustomDataConfigs[configKey].Label)
+                .ToString(defaultValue);
+        }
+
+        /// <summary>
+        /// Gets a boolean value from custom data by config key
+        /// </summary>
+        /// <param name="configKey">The key in CustomDataConfigs dictionary</param>
+        /// <param name="defaultValue">Default value if key not found</param>
+        /// <returns>The configured boolean value</returns>
+        protected bool GetCustomDataBool(string configKey, bool defaultValue = false)
+        {
+            if (CustomDataConfigs == null || !CustomDataConfigs.ContainsKey(configKey))
+            {
+                return defaultValue;
+            }
+
+            try
+            {
+                ParseCustomData();
+                return _customData
+                    .Get(_customDataHeader, CustomDataConfigs[configKey].Label)
+                    .ToBoolean(defaultValue);
+            }
+            catch
+            {
+                return defaultValue;
+            }
+        }
     }
 }

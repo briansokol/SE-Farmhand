@@ -165,20 +165,16 @@ namespace IngameScript
             // Determine if this is an alternate frame for blinking (odd frames: 1, 3, 5)
             bool isAlternateFrame = (_runNumber % 2) == 1;
 
-            // Get colors for the plot
-            Color outlineColor = GetPlotColor(farmPlot, isAlternateFrame);
-            Color progressBarColor = GetProgressBarColor(farmPlot, isAlternateFrame);
+            // Get plot details once
+            var plotDetails = farmPlot.GetPlotDetails();
 
-            // Get growth progress
-            float growthProgress = 0f;
-            if (farmPlot.IsPlantPlanted && farmPlot.IsPlantAlive)
-            {
-                var details = farmPlot.GetPlotDetails();
-                if (details != null)
-                {
-                    growthProgress = details.GrowthProgress;
-                }
-            }
+            // Calculate render state using helper
+            var renderState = RenderHelpers.CalculatePlotRenderState(
+                farmPlot,
+                plotDetails,
+                _programmableBlock,
+                isAlternateFrame
+            );
 
             // Draw plant icon or circle for empty plots
             if (farmPlot.IsPlantPlanted)
@@ -196,7 +192,7 @@ namespace IngameScript
                 waterBarX,
                 waterBarY,
                 usableHeight,
-                outlineColor,
+                renderState.OutlineColor,
                 farmPlot,
                 WATER_BAR_WIDTH_HALF
             );
@@ -208,9 +204,9 @@ namespace IngameScript
                 growthBarY,
                 growthBarWidth,
                 usableHeight,
-                growthProgress,
-                outlineColor,
-                progressBarColor
+                renderState.GrowthProgress,
+                renderState.OutlineColor,
+                renderState.ProgressBarColor
             );
         }
 
@@ -245,20 +241,16 @@ namespace IngameScript
             // Determine if this is an alternate frame for blinking (odd frames: 1, 3, 5)
             bool isAlternateFrame = (_runNumber % 2) == 1;
 
-            // Get colors for the plot
-            Color outlineColor = GetPlotColor(farmPlot, isAlternateFrame);
-            Color progressBarColor = GetProgressBarColor(farmPlot, isAlternateFrame);
+            // Get plot details once
+            var plotDetails = farmPlot.GetPlotDetails();
 
-            // Get growth progress
-            float growthProgress = 0f;
-            if (farmPlot.IsPlantPlanted && farmPlot.IsPlantAlive)
-            {
-                var details = farmPlot.GetPlotDetails();
-                if (details != null)
-                {
-                    growthProgress = details.GrowthProgress;
-                }
-            }
+            // Calculate render state using helper
+            var renderState = RenderHelpers.CalculatePlotRenderState(
+                farmPlot,
+                plotDetails,
+                _programmableBlock,
+                isAlternateFrame
+            );
 
             // Draw plant icon or circle for empty plots
             if (farmPlot.IsPlantPlanted)
@@ -276,7 +268,7 @@ namespace IngameScript
                 waterBarX,
                 waterBarY,
                 usableHeight,
-                outlineColor,
+                renderState.OutlineColor,
                 farmPlot,
                 WATER_BAR_WIDTH
             );
@@ -288,9 +280,9 @@ namespace IngameScript
                 growthBarY,
                 growthBarWidth,
                 usableHeight,
-                growthProgress,
-                outlineColor,
-                progressBarColor
+                renderState.GrowthProgress,
+                renderState.OutlineColor,
+                renderState.ProgressBarColor
             );
         }
 
@@ -483,140 +475,16 @@ namespace IngameScript
             }
 
             // Water bar shows water warning or base plant status
-            if (farmPlot.WaterFilledRatio <= _programmableBlock.WaterLowThreshold)
-            {
-                return _programmableBlock.WaterLowColor;
-            }
-            else
-            {
-                return GetPlotColor(farmPlot, false); // Base plant color (no blinking)
-            }
-        }
+            // Get plot details and calculate render state
+            var plotDetails = farmPlot.GetPlotDetails();
+            var renderState = RenderHelpers.CalculatePlotRenderState(
+                farmPlot,
+                plotDetails,
+                _programmableBlock,
+                false // No blinking for water bar color
+            );
 
-        /// <summary>
-        /// Determines the appropriate color for a farm plot based on its plant state
-        /// (Same logic as SpriteRenderer.GetPlotColor)
-        /// </summary>
-        private Color GetPlotColor(FarmPlot plot, bool isAlternateFrame)
-        {
-            if (_programmableBlock == null)
-            {
-                return Color.Green;
-            }
-
-            // Get plot details to check health
-            var plotDetails = plot.GetPlotDetails();
-
-            // Check if plot has low health (takes priority over low water)
-            // Outline blinks when health is low
-            bool isLowHealth =
-                plot.IsPlantPlanted
-                && plot.IsPlantAlive
-                && plotDetails != null
-                && plotDetails.CropHealth < _programmableBlock.HealthLowThreshold;
-
-            if (isLowHealth && isAlternateFrame)
-            {
-                return _programmableBlock.PlantedDeadColor;
-            }
-
-            // Check if plot has low water and should show warning color on alternate frames
-            bool isLowWater =
-                plot.IsFunctional()
-                && plot.WaterFilledRatio <= _programmableBlock.WaterLowThreshold
-                && !isLowHealth; // Only show water warning if health is not low
-
-            if (isLowWater && isAlternateFrame)
-            {
-                return _programmableBlock.WaterLowColor;
-            }
-
-            if (plot.IsPlantPlanted)
-            {
-                if (plot.IsPlantAlive)
-                {
-                    if (plot.IsPlantFullyGrown)
-                    {
-                        return _programmableBlock.PlantedReadyColor;
-                    }
-                    else
-                    {
-                        return _programmableBlock.PlantedAliveColor;
-                    }
-                }
-                else
-                {
-                    return _programmableBlock.PlantedDeadColor;
-                }
-            }
-            else
-            {
-                return _programmableBlock.PlanterEmptyColor;
-            }
-        }
-
-        /// <summary>
-        /// Determines the appropriate color for a farm plot's progress bar based on its plant state
-        /// (Same logic as SpriteRenderer.GetProgressBarColor)
-        /// </summary>
-        private Color GetProgressBarColor(FarmPlot plot, bool isAlternateFrame)
-        {
-            if (_programmableBlock == null)
-            {
-                return Color.Green;
-            }
-
-            // Get plot details to check health
-            var plotDetails = plot.GetPlotDetails();
-
-            // Check if plot has low health
-            bool isLowHealth =
-                plot.IsPlantPlanted
-                && plot.IsPlantAlive
-                && plotDetails != null
-                && plotDetails.CropHealth < _programmableBlock.HealthLowThreshold;
-
-            // Check if plot has low water (only matters if health is OK)
-            bool isLowWater =
-                plot.IsFunctional()
-                && plot.WaterFilledRatio <= _programmableBlock.WaterLowThreshold
-                && !isLowHealth; // Only show water warning if health is not low
-
-            if (plot.IsPlantPlanted)
-            {
-                if (plot.IsPlantAlive)
-                {
-                    // Priority: Ready color > Low health warning > Growing color
-                    if (plot.IsPlantFullyGrown)
-                    {
-                        // Plant is ready - show ready color even if health is low
-                        return _programmableBlock.PlantedReadyColor;
-                    }
-                    else if (isLowHealth)
-                    {
-                        // Plant is growing but health is low - show dead color (solid)
-                        return _programmableBlock.PlantedDeadColor;
-                    }
-                    else if (isLowWater && isAlternateFrame)
-                    {
-                        // Plant is growing, health OK, but water low - blink water warning
-                        return _programmableBlock.WaterLowColor;
-                    }
-                    else
-                    {
-                        // Plant is growing normally
-                        return _programmableBlock.PlantedAliveColor;
-                    }
-                }
-                else
-                {
-                    return _programmableBlock.PlantedDeadColor;
-                }
-            }
-            else
-            {
-                return _programmableBlock.PlanterEmptyColor;
-            }
+            return renderState.WaterBarColor;
         }
     }
 }

@@ -2,6 +2,7 @@
 using System.Linq;
 using Sandbox.ModAPI.Ingame;
 using SpaceEngineers.Game.ModAPI.Ingame;
+using VRage.Game.GUI.TextPanel;
 
 namespace IngameScript
 {
@@ -169,7 +170,11 @@ namespace IngameScript
         /// </summary>
         void PrintDiagnosticHeader()
         {
-            var header = GetHeaderAnimation(runNumber);
+            var header = RenderHelpers.GetHeaderAnimation(
+                runNumber,
+                "Farmhand",
+                TextAlignment.LEFT
+            );
 
             if (runNumber >= 5)
             {
@@ -355,24 +360,37 @@ namespace IngameScript
                 // Check farm plots
                 if (farmGroup.FarmPlots.Count > 0)
                 {
+                    // Cache threshold values for performance
+                    var healthLowThreshold = thisPb.HealthLowThreshold;
+                    var waterLowThreshold = thisPb.WaterLowThreshold;
+
                     farmGroup.FarmPlots.ForEach(farmPlot =>
                     {
                         var plantType = farmPlot.PlantType;
                         var plantYield = farmPlot.PlantYieldAmount;
+
+                        // Cache plot details to avoid repeated string parsing
                         var plotDetails = farmPlot.GetPlotDetails();
 
-                        stats.WaterUsagePerMinute += plotDetails.WaterUsage;
+                        if (plotDetails != null)
+                        {
+                            stats.WaterUsagePerMinute += plotDetails.WaterUsage;
+                        }
 
                         if (farmPlot.IsPlantPlanted)
                         {
                             if (farmPlot.IsPlantAlive)
                             {
-                                // Set the plot plant count
-                                stats.PlotSummary[plantType] = stats.PlotSummary.ContainsKey(
-                                    plantType
-                                )
-                                    ? stats.PlotSummary[plantType] + 1
-                                    : 1;
+                                // Set the plot plant count using TryGetValue for better performance
+                                int currentCount;
+                                if (stats.PlotSummary.TryGetValue(plantType, out currentCount))
+                                {
+                                    stats.PlotSummary[plantType] = currentCount + 1;
+                                }
+                                else
+                                {
+                                    stats.PlotSummary[plantType] = 1;
+                                }
 
                                 // Priority: Ready to harvest > Low health warning > Growing
                                 if (farmPlot.IsPlantFullyGrown)
@@ -381,14 +399,21 @@ namespace IngameScript
                                     farmPlot.SetLightColor(thisPb.PlantedReadyColor);
                                     stats.FarmPlotsReadyToHarvest++;
 
-                                    // Set the yield summary
-                                    stats.YieldSummary[plantType] = stats.YieldSummary.ContainsKey(
-                                        plantType
-                                    )
-                                        ? stats.YieldSummary[plantType] + plantYield
-                                        : plantYield;
+                                    // Set the yield summary using TryGetValue for better performance
+                                    int currentYield;
+                                    if (stats.YieldSummary.TryGetValue(plantType, out currentYield))
+                                    {
+                                        stats.YieldSummary[plantType] = currentYield + plantYield;
+                                    }
+                                    else
+                                    {
+                                        stats.YieldSummary[plantType] = plantYield;
+                                    }
                                 }
-                                else if (plotDetails.CropHealth < thisPb.HealthLowThreshold)
+                                else if (
+                                    plotDetails != null
+                                    && plotDetails.CropHealth < healthLowThreshold
+                                )
                                 {
                                     // Plant is growing but health is critically low - set dead color and blink
                                     farmPlot.SetLightColor(thisPb.PlantedDeadColor);
@@ -404,16 +429,24 @@ namespace IngameScript
                                     // Plant is still growing normally
                                     farmPlot.SetLightColor(thisPb.PlantedAliveColor);
 
-                                    if (
-                                        !stats.GrowthSummary.ContainsKey(plantType)
-                                        || (
-                                            plotDetails.GrowthProgress
-                                                > stats.GrowthSummary[plantType]
-                                            && plotDetails.GrowthProgress < 1f
-                                        )
-                                    )
+                                    if (plotDetails != null)
                                     {
-                                        stats.GrowthSummary[plantType] = plotDetails.GrowthProgress;
+                                        // Use TryGetValue for better performance
+                                        float currentGrowth;
+                                        if (
+                                            !stats.GrowthSummary.TryGetValue(
+                                                plantType,
+                                                out currentGrowth
+                                            )
+                                            || (
+                                                plotDetails.GrowthProgress > currentGrowth
+                                                && plotDetails.GrowthProgress < 1f
+                                            )
+                                        )
+                                        {
+                                            stats.GrowthSummary[plantType] =
+                                                plotDetails.GrowthProgress;
+                                        }
                                     }
                                 }
                             }
@@ -440,13 +473,14 @@ namespace IngameScript
                         bool isHealthLow =
                             farmPlot.IsPlantPlanted
                             && farmPlot.IsPlantAlive
-                            && plotDetails.CropHealth < thisPb.HealthLowThreshold;
+                            && plotDetails != null
+                            && plotDetails.CropHealth < healthLowThreshold;
 
                         bool isReady = farmPlot.IsPlantPlanted && farmPlot.IsPlantFullyGrown;
 
                         if (
                             farmPlot.IsFunctional()
-                            && farmPlot.WaterFilledRatio <= thisPb.WaterLowThreshold
+                            && farmPlot.WaterFilledRatio <= waterLowThreshold
                             && !isHealthLow
                             && !isReady
                         )
@@ -606,12 +640,18 @@ namespace IngameScript
                 {
                     foreach (KeyValuePair<string, int> entry in stats.PlotSummary)
                     {
-                        int plantYield = stats.YieldSummary.ContainsKey(entry.Key)
-                            ? stats.YieldSummary[entry.Key]
-                            : 0;
-                        float growthProgress = stats.GrowthSummary.ContainsKey(entry.Key)
-                            ? stats.GrowthSummary[entry.Key]
-                            : 0f;
+                        // Use TryGetValue for better performance
+                        int plantYield;
+                        if (!stats.YieldSummary.TryGetValue(entry.Key, out plantYield))
+                        {
+                            plantYield = 0;
+                        }
+
+                        float growthProgress;
+                        if (!stats.GrowthSummary.TryGetValue(entry.Key, out growthProgress))
+                        {
+                            growthProgress = 0f;
+                        }
 
                         var yieldText = new List<string>();
                         if (growthProgress > 0f)
@@ -772,15 +812,6 @@ namespace IngameScript
         void WriteToDiagnosticOutput(string text, bool header = false)
         {
             thisPb.AppendText(text, header);
-        }
-
-        string GetHeaderAnimation(int runNumber)
-        {
-            var title = "Farmhand";
-            var animationEnd = new[] { "•––", "–•–", "––•" };
-            var frameNumber = runNumber > 2 ? runNumber - 3 : runNumber;
-
-            return $"{title} {animationEnd[frameNumber % animationEnd.Length]}";
         }
     }
 }
