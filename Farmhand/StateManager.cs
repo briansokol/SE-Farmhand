@@ -10,6 +10,7 @@ namespace IngameScript
         private readonly Dictionary<string, bool> _previousStates = new Dictionary<string, bool>();
         private readonly List<Timer> _timers = new List<Timer>();
         private readonly List<ActionRelay> _actionRelays = new List<ActionRelay>();
+        private readonly List<BroadcastController> _broadcastControllers = new List<BroadcastController>();
 
         /// <summary>
         /// Registers a timer to be managed by this state manager
@@ -30,6 +31,15 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Registers a broadcast controller to be managed by this state manager
+        /// </summary>
+        /// <param name="broadcastController">The broadcast controller to register</param>
+        public void RegisterBroadcastController(BroadcastController broadcastController)
+        {
+            _broadcastControllers.Add(broadcastController);
+        }
+
+        /// <summary>
         /// Clears all registered timers
         /// </summary>
         public void ClearTimers()
@@ -43,6 +53,14 @@ namespace IngameScript
         public void ClearActionRelays()
         {
             _actionRelays.Clear();
+        }
+
+        /// <summary>
+        /// Clears all registered broadcast controllers
+        /// </summary>
+        public void ClearBroadcastControllers()
+        {
+            _broadcastControllers.Clear();
         }
 
         /// <summary>
@@ -74,6 +92,12 @@ namespace IngameScript
                 foreach (ActionRelay actionRelay in _actionRelays)
                 {
                     actionRelay.Trigger(eventToTrigger);
+                }
+
+                // Trigger all registered broadcast controllers for this event
+                foreach (BroadcastController broadcastController in _broadcastControllers)
+                {
+                    broadcastController.Trigger(eventToTrigger);
                 }
             }
             else
@@ -142,5 +166,10 @@ namespace IngameScript
         /// Gets the count of registered action relays
         /// </summary>
         public int RegisteredActionRelayCount => _actionRelays.Count;
+
+        /// <summary>
+        /// Gets the count of registered broadcast controllers
+        /// </summary>
+        public int RegisteredBroadcastControllerCount => _broadcastControllers.Count;
     }
 }

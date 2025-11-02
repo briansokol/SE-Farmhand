@@ -17,6 +17,7 @@ namespace IngameScript
         public List<Cockpit> Cockpits { get; }
         public List<AirVent> AirVents { get; }
         public List<SolarFoodGenerator> SolarFoodGenerators { get; }
+        public List<BroadcastController> BroadcastControllers { get; }
         public StateManager StateManager { get; }
         public FarmStats Stats { get; set; }
         public ProgrammableBlock ProgrammableBlock { get; set; }
@@ -35,6 +36,7 @@ namespace IngameScript
             Cockpits = new List<Cockpit>();
             AirVents = new List<AirVent>();
             SolarFoodGenerators = new List<SolarFoodGenerator>();
+            BroadcastControllers = new List<BroadcastController>();
             StateManager = new StateManager();
             Stats = new FarmStats();
         }
@@ -210,6 +212,27 @@ namespace IngameScript
             );
             validActionRelays.ForEach(block =>
                 group.StateManager.RegisterActionRelay(new ActionRelay(block, program))
+            );
+        }
+
+        /// <summary>
+        /// Discovers and registers broadcast controllers for the specified group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group</param>
+        public void FindBroadcastControllers(string groupName)
+        {
+            var group = GetGroup(groupName);
+            IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
+            group.StateManager.ClearBroadcastControllers();
+
+            List<IMyBroadcastController> validBroadcastControllers = new List<IMyBroadcastController>();
+            blockGroup?.GetBlocksOfType(
+                validBroadcastControllers,
+                block => BroadcastController.BlockIsValid(block)
+            );
+            validBroadcastControllers.ForEach(block =>
+                group.StateManager.RegisterBroadcastController(new BroadcastController(block, program))
             );
         }
 

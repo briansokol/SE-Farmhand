@@ -235,6 +235,12 @@ namespace IngameScript
                             $"Action Relays: {farmGroup.StateManager.RegisteredActionRelayCount}"
                         );
                     }
+                    if (farmGroup.StateManager.RegisteredBroadcastControllerCount > 0)
+                    {
+                        WriteToDiagnosticOutput(
+                            $"Broadcast Controllers: {farmGroup.StateManager.RegisteredBroadcastControllerCount}"
+                        );
+                    }
                 });
 
             // Print PlotLCD count (independent of groups)
@@ -328,6 +334,7 @@ namespace IngameScript
                 farmGroups.FindSolarFoodGenerators(groupName);
                 farmGroups.FindTimers(groupName);
                 farmGroups.FindActionRelays(groupName);
+                farmGroups.FindBroadcastControllers(groupName);
             }
         }
 
