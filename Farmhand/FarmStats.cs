@@ -93,6 +93,16 @@ namespace IngameScript
         public float MaxIceKg { get; set; }
 
         /// <summary>
+        /// Total food production rate in items per minute across all solar food generators
+        /// </summary>
+        public float TotalFoodItemsPerMinute { get; set; }
+
+        /// <summary>
+        /// Minimum time remaining until next batch across all solar food generators (in seconds)
+        /// </summary>
+        public float MinTimeRemainingUntilNextBatch { get; set; }
+
+        /// <summary>
         /// List of alert messages requiring attention
         /// </summary>
         public List<string> AlertMessages { get; set; }
@@ -119,6 +129,8 @@ namespace IngameScript
             OxygenLevel = 0f;
             VentStatusText = "";
             IceRatio = 0f;
+            TotalFoodItemsPerMinute = 0f;
+            MinTimeRemainingUntilNextBatch = 0f;
         }
     }
 }

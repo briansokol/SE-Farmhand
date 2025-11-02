@@ -187,7 +187,7 @@ namespace IngameScript
 
             WriteToDiagnosticOutput(header, true);
             WriteToDiagnosticOutput($"{Version} | ({PublishedDate})", true);
-            WriteToDiagnosticOutput("");
+            WriteToDiagnosticOutput("", true);
 
             // Print diagnostic info once per cycle
             farmGroups
@@ -216,6 +216,12 @@ namespace IngameScript
                     if (farmGroup.AirVents.Count > 0)
                     {
                         WriteToDiagnosticOutput($"Air Vents: {farmGroup.AirVents.Count}");
+                    }
+                    if (farmGroup.SolarFoodGenerators.Count > 0)
+                    {
+                        WriteToDiagnosticOutput(
+                            $"Solar Food Generators: {farmGroup.SolarFoodGenerators.Count}"
+                        );
                     }
                     if (farmGroup.StateManager.RegisteredTimerCount > 0)
                     {
@@ -319,6 +325,7 @@ namespace IngameScript
                 farmGroups.FindFarmPlots(groupName);
                 farmGroups.FindIrrigationSystems(groupName);
                 farmGroups.FindAirVents(groupName);
+                farmGroups.FindSolarFoodGenerators(groupName);
                 farmGroups.FindTimers(groupName);
                 farmGroups.FindActionRelays(groupName);
             }
@@ -576,6 +583,26 @@ namespace IngameScript
                         );
                     }
 
+                    // Check solar food generators
+                    if (farmGroup.SolarFoodGenerators.Count > 0)
+                    {
+                        float totalItemsPerMinute = 0f;
+                        float minTimeRemaining = float.MaxValue;
+
+                        farmGroup.SolarFoodGenerators.ForEach(generator =>
+                        {
+                            totalItemsPerMinute += generator.ItemsPerMinute;
+                            if (generator.TimeRemainingUntilNextBatch < minTimeRemaining)
+                            {
+                                minTimeRemaining = generator.TimeRemainingUntilNextBatch;
+                            }
+                        });
+
+                        stats.TotalFoodItemsPerMinute = totalItemsPerMinute;
+                        stats.MinTimeRemainingUntilNextBatch =
+                            minTimeRemaining != float.MaxValue ? minTimeRemaining : 0f;
+                    }
+
                     // Update state manager with stats
                     farmGroup.StateManager.UpdateState("OnCropDead", stats.DeadPlants > 0);
                     farmGroup.StateManager.UpdateState("OnCropAvailable", stats.SeedsNeeded > 0);
@@ -607,6 +634,7 @@ namespace IngameScript
                 var farmPlotMessages = new List<string>();
                 var atmosphereMessages = new List<string>();
                 var irrigationMessages = new List<string>();
+                var solarFoodGeneratorMessages = new List<string>();
                 var yieldMessages = new List<string>();
 
                 if (stats.DeadPlants > 0)
@@ -645,6 +673,31 @@ namespace IngameScript
                 else
                 {
                     stats.AlertMessages.Add("No Working Irrigation Systems!");
+                }
+
+                if (farmGroup.SolarFoodGenerators.Count > 0)
+                {
+                    solarFoodGeneratorMessages.Add(
+                        $"Production Rate: {stats.TotalFoodItemsPerMinute:F2} items/min"
+                    );
+
+                    // Format time with appropriate units
+                    string timeText;
+                    float timeInSeconds = stats.MinTimeRemainingUntilNextBatch;
+                    if (timeInSeconds < 60f)
+                    {
+                        timeText = $"{timeInSeconds:F1} sec";
+                    }
+                    else if (timeInSeconds < 3600f)
+                    {
+                        timeText = $"{timeInSeconds / 60f:F1} min";
+                    }
+                    else
+                    {
+                        timeText = $"{timeInSeconds / 3600f:F1} hr";
+                    }
+
+                    solarFoodGeneratorMessages.Add($"Next Production: {timeText}");
                 }
 
                 // Yield summary
@@ -715,6 +768,20 @@ namespace IngameScript
                         WriteToMainOutput(groupName, message, "ShowIrrigation")
                     );
                     WriteToMainOutput(groupName, "", "ShowIrrigation");
+                }
+
+                if (solarFoodGeneratorMessages.Count > 0)
+                {
+                    WriteToMainOutput(
+                        groupName,
+                        "Solar Food Generators",
+                        "ShowSolarFoodGenerators",
+                        isHeader: true
+                    );
+                    solarFoodGeneratorMessages.ForEach(message =>
+                        WriteToMainOutput(groupName, message, "ShowSolarFoodGenerators")
+                    );
+                    WriteToMainOutput(groupName, "", "ShowSolarFoodGenerators");
                 }
 
                 if (yieldMessages.Count > 0)

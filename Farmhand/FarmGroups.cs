@@ -16,6 +16,7 @@ namespace IngameScript
         public List<LcdPanel> LcdPanels { get; }
         public List<Cockpit> Cockpits { get; }
         public List<AirVent> AirVents { get; }
+        public List<SolarFoodGenerator> SolarFoodGenerators { get; }
         public StateManager StateManager { get; }
         public FarmStats Stats { get; set; }
         public ProgrammableBlock ProgrammableBlock { get; set; }
@@ -33,6 +34,7 @@ namespace IngameScript
             LcdPanels = new List<LcdPanel>();
             Cockpits = new List<Cockpit>();
             AirVents = new List<AirVent>();
+            SolarFoodGenerators = new List<SolarFoodGenerator>();
             StateManager = new StateManager();
             Stats = new FarmStats();
         }
@@ -149,6 +151,27 @@ namespace IngameScript
             List<IMyAirVent> validAirVents = new List<IMyAirVent>();
             blockGroup?.GetBlocksOfType(validAirVents, block => AirVent.BlockIsValid(block));
             validAirVents.ForEach(block => group.AirVents.Add(new AirVent(block, program)));
+        }
+
+        /// <summary>
+        /// Discovers and registers solar food generators for the specified group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group</param>
+        public void FindSolarFoodGenerators(string groupName)
+        {
+            var group = GetGroup(groupName);
+            IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
+            group.SolarFoodGenerators.Clear();
+
+            List<IMyFunctionalBlock> validSolarFoodGenerators = new List<IMyFunctionalBlock>();
+            blockGroup?.GetBlocksOfType(
+                validSolarFoodGenerators,
+                block => SolarFoodGenerator.BlockIsValid(block)
+            );
+            validSolarFoodGenerators.ForEach(block =>
+                group.SolarFoodGenerators.Add(new SolarFoodGenerator(block, program))
+            );
         }
 
         /// <summary>

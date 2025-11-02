@@ -70,6 +70,14 @@ namespace IngameScript
                 )
             },
             {
+                "ShowSolarFoodGenerators",
+                new CustomDataConfig(
+                    "Show Solar Food Generators",
+                    "0",
+                    "Shows solar food generator status (set index of screen, false to hide)"
+                )
+            },
+            {
                 "ShowYield",
                 new CustomDataConfig(
                     "Show Yield",

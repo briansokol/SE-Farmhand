@@ -59,6 +59,14 @@ namespace IngameScript
                 "ShowIrrigation",
                 new CustomDataConfig("Show Irrigation", "true", "Shows irrigation system status")
             },
+            {
+                "ShowSolarFoodGenerators",
+                new CustomDataConfig(
+                    "Show Solar Food Generators",
+                    "true",
+                    "Shows solar food generator status"
+                )
+            },
             { "ShowYield", new CustomDataConfig("Show Yield", "true", "Shows current crop yield") },
             {
                 "TextAlignment",
