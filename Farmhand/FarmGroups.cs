@@ -170,6 +170,27 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Discovers and registers action relays for the specified group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group</param>
+        public void FindActionRelays(string groupName)
+        {
+            var group = GetGroup(groupName);
+            IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
+            group.StateManager.ClearActionRelays();
+
+            List<IMyTransponder> validActionRelays = new List<IMyTransponder>();
+            blockGroup?.GetBlocksOfType(
+                validActionRelays,
+                block => ActionRelay.BlockIsValid(block)
+            );
+            validActionRelays.ForEach(block =>
+                group.StateManager.RegisterActionRelay(new ActionRelay(block, program))
+            );
+        }
+
+        /// <summary>
         /// Gets all registered farm groups
         /// </summary>
         /// <returns>List of all farm groups</returns>

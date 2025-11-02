@@ -9,6 +9,7 @@ namespace IngameScript
     {
         private readonly Dictionary<string, bool> _previousStates = new Dictionary<string, bool>();
         private readonly List<Timer> _timers = new List<Timer>();
+        private readonly List<ActionRelay> _actionRelays = new List<ActionRelay>();
 
         /// <summary>
         /// Registers a timer to be managed by this state manager
@@ -20,6 +21,15 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Registers an action relay to be managed by this state manager
+        /// </summary>
+        /// <param name="actionRelay">The action relay to register</param>
+        public void RegisterActionRelay(ActionRelay actionRelay)
+        {
+            _actionRelays.Add(actionRelay);
+        }
+
+        /// <summary>
         /// Clears all registered timers
         /// </summary>
         public void ClearTimers()
@@ -28,7 +38,15 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Updates a state value and triggers associated timers if the state changed
+        /// Clears all registered action relays
+        /// </summary>
+        public void ClearActionRelays()
+        {
+            _actionRelays.Clear();
+        }
+
+        /// <summary>
+        /// Updates a state value and triggers associated timers and action relays if the state changed
         /// </summary>
         /// <param name="stateName">The name of the state to update</param>
         /// <param name="currentValue">The current value of the state</param>
@@ -50,6 +68,12 @@ namespace IngameScript
                 foreach (Timer timer in _timers)
                 {
                     timer.Trigger(eventToTrigger);
+                }
+
+                // Trigger all registered action relays for this event
+                foreach (ActionRelay actionRelay in _actionRelays)
+                {
+                    actionRelay.Trigger(eventToTrigger);
                 }
             }
             else
@@ -113,5 +137,10 @@ namespace IngameScript
         /// Gets the count of registered timers
         /// </summary>
         public int RegisteredTimerCount => _timers.Count;
+
+        /// <summary>
+        /// Gets the count of registered action relays
+        /// </summary>
+        public int RegisteredActionRelayCount => _actionRelays.Count;
     }
 }

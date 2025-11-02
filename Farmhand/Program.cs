@@ -223,6 +223,12 @@ namespace IngameScript
                             $"Timers: {farmGroup.StateManager.RegisteredTimerCount}"
                         );
                     }
+                    if (farmGroup.StateManager.RegisteredActionRelayCount > 0)
+                    {
+                        WriteToDiagnosticOutput(
+                            $"Action Relays: {farmGroup.StateManager.RegisteredActionRelayCount}"
+                        );
+                    }
                 });
 
             // Print PlotLCD count (independent of groups)
@@ -314,6 +320,7 @@ namespace IngameScript
                 farmGroups.FindIrrigationSystems(groupName);
                 farmGroups.FindAirVents(groupName);
                 farmGroups.FindTimers(groupName);
+                farmGroups.FindActionRelays(groupName);
             }
         }
 
