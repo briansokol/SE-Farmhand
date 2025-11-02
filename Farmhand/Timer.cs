@@ -77,7 +77,7 @@ namespace IngameScript
             {
                 "OnCropReadyTrue",
                 new CustomDataConfig(
-                    "On Crop Ready",
+                    "On Any Crop Ready",
                     "false",
                     "Triggers when any farm plot crop is ready for harvest"
                 )
@@ -85,7 +85,7 @@ namespace IngameScript
             {
                 "OnCropReadyFalse",
                 new CustomDataConfig(
-                    "On Crop Not Ready",
+                    "On No Crops Ready",
                     "false",
                     "Triggers when no farm plots are ready for harvest"
                 )
@@ -101,7 +101,7 @@ namespace IngameScript
             {
                 "OnAllCropsReadyFalse",
                 new CustomDataConfig(
-                    "On All Crops Not Ready",
+                    "On Not All Crops Ready",
                     "false",
                     "Triggers when you plant a crop while all other planted plots are ready for harvest"
                 )
@@ -117,7 +117,7 @@ namespace IngameScript
             {
                 "OnCropDyingFalse",
                 new CustomDataConfig(
-                    "On Crop Not Dying",
+                    "On No Crops Dying",
                     "false",
                     "Triggers when all farm plots' health are above threshold or all have died"
                 )
@@ -133,7 +133,7 @@ namespace IngameScript
             {
                 "OnCropDeadFalse",
                 new CustomDataConfig(
-                    "On Crop Not Dead",
+                    "On No Dead Crops",
                     "false",
                     "Triggers when no farm plots have dead crops"
                 )
@@ -141,7 +141,7 @@ namespace IngameScript
             {
                 "OnCropAvailableTrue",
                 new CustomDataConfig(
-                    "On Crop Available",
+                    "On Plot Empty",
                     "false",
                     "Triggers when a farm plot crop is available for planting"
                 )
@@ -149,7 +149,7 @@ namespace IngameScript
             {
                 "OnCropAvailableFalse",
                 new CustomDataConfig(
-                    "On Crop Not Available",
+                    "On No Plots Empty",
                     "false",
                     "Triggers when no farm plots have crops available for planting"
                 )

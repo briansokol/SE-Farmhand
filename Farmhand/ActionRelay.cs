@@ -67,7 +67,7 @@ namespace IngameScript
             {
                 "OnCropReadyTrue",
                 new CustomDataConfig(
-                    "On Crop Ready",
+                    "On Any Crop Ready",
                     "0",
                     "Channel (1-100) to signal when any farm plot crop is ready for harvest. 0 = disabled"
                 )
@@ -75,7 +75,7 @@ namespace IngameScript
             {
                 "OnCropReadyFalse",
                 new CustomDataConfig(
-                    "On Crop Not Ready",
+                    "On No Crops Ready",
                     "0",
                     "Channel (1-100) to signal when no farm plots are ready for harvest. 0 = disabled"
                 )
@@ -91,7 +91,7 @@ namespace IngameScript
             {
                 "OnAllCropsReadyFalse",
                 new CustomDataConfig(
-                    "On All Crops Not Ready",
+                    "On Not All Crops Ready",
                     "0",
                     "Channel (1-100) to signal when you plant a crop while all other planted plots are ready for harvest. 0 = disabled"
                 )
@@ -107,7 +107,7 @@ namespace IngameScript
             {
                 "OnCropDyingFalse",
                 new CustomDataConfig(
-                    "On Crop Not Dying",
+                    "On No Crops Dying",
                     "0",
                     "Channel (1-100) to signal when all farm plots' health are above threshold or all have died. 0 = disabled"
                 )
@@ -123,7 +123,7 @@ namespace IngameScript
             {
                 "OnCropDeadFalse",
                 new CustomDataConfig(
-                    "On Crop Not Dead",
+                    "On No Dead Crops",
                     "0",
                     "Channel (1-100) to signal when no farm plots have dead crops. 0 = disabled"
                 )
@@ -131,7 +131,7 @@ namespace IngameScript
             {
                 "OnCropAvailableTrue",
                 new CustomDataConfig(
-                    "On Crop Available",
+                    "On Plot Empty",
                     "0",
                     "Channel (1-100) to signal when a farm plot crop is available for planting. 0 = disabled"
                 )
@@ -139,7 +139,7 @@ namespace IngameScript
             {
                 "OnCropAvailableFalse",
                 new CustomDataConfig(
-                    "On Crop Not Available",
+                    "On No Plots Empty",
                     "0",
                     "Channel (1-100) to signal when no farm plots have crops available for planting. 0 = disabled"
                 )
