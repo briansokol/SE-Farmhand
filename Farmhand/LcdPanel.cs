@@ -260,7 +260,7 @@ namespace IngameScript
         /// <returns>True if the block can be used as an LCD panel</returns>
         public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            return block is IMyTextPanel && IsBlockValid(block) && (block as IMyTextPanel).Enabled;
+            return block is IMyTextPanel && IsBlockValid(block);
         }
     }
 }

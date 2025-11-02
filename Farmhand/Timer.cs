@@ -218,9 +218,7 @@ namespace IngameScript
         /// <returns>True if the block can be used as a timer</returns>
         public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            return IsBlockValid(block)
-                && block is IMyTimerBlock
-                && (block as IMyTimerBlock).Enabled;
+            return IsBlockValid(block) && block is IMyTimerBlock;
         }
     }
 }

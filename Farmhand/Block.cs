@@ -63,7 +63,17 @@ namespace IngameScript
         protected static bool IsBlockValid<T>(T block)
             where T : class, IMyTerminalBlock
         {
-            return block != null && !block.Closed;
+            if (block is IMyFunctionalBlock)
+            {
+                return block != null
+                    && !block.Closed
+                    && (block as IMyFunctionalBlock).Enabled
+                    && (block as IMyFunctionalBlock).IsFunctional;
+            }
+            else
+            {
+                return block != null && !block.Closed;
+            }
         }
 
         /// <summary>

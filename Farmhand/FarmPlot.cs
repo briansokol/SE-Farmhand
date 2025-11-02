@@ -405,11 +405,7 @@ namespace IngameScript
         /// <returns>True if the block can be used as a farm plot</returns>
         public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            if (
-                !(block is IMyFunctionalBlock)
-                || !IsBlockValid(block)
-                || !(block as IMyFunctionalBlock).Enabled
-            )
+            if (!IsBlockValid(block))
             {
                 return false;
             }

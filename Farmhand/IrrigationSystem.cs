@@ -56,11 +56,7 @@ namespace IngameScript
         /// <returns>True if the block can be used as an irrigation system</returns>
         public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            if (
-                !(block is IMyGasGenerator)
-                || !IsBlockValid(block)
-                || !(block as IMyGasGenerator).Enabled
-            )
+            if (!(block is IMyGasGenerator) || !IsBlockValid(block))
             {
                 return false;
             }

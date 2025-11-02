@@ -45,7 +45,7 @@ namespace IngameScript
         /// </summary>
         public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            return block is IMyAirVent && (block as IMyAirVent).Enabled && IsBlockValid(block);
+            return block is IMyAirVent && IsBlockValid(block);
         }
     }
 }
