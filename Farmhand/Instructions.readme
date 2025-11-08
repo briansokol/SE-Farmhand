@@ -1,6 +1,6 @@
-Farmhand v0.10.0
+Farmhand v0.11.0
 Automated Farm Management
-By Duke Skyloafer | 2025-10-23
+By Duke Skyloafer | 2025-11-07
 
 Full guide: https://steamcommunity.com/sharedfiles/filedetails/?id=3575736083
 
@@ -11,6 +11,8 @@ QUICK SETUP
    - Irrigation Systems
    - Air Vents
    - Timer Blocks
+   - Broadcast Controllers
+   - Action Relays
 
 2. Add Display Screens: Put [FarmLCD] in the name of any LCD panel or multi-screen block (cockpit, control seat, etc.)
 
