@@ -10,7 +10,8 @@ namespace IngameScript
         private readonly Dictionary<string, bool> _previousStates = new Dictionary<string, bool>();
         private readonly List<Timer> _timers = new List<Timer>();
         private readonly List<ActionRelay> _actionRelays = new List<ActionRelay>();
-        private readonly List<BroadcastController> _broadcastControllers = new List<BroadcastController>();
+        private readonly List<BroadcastController> _broadcastControllers =
+            new List<BroadcastController>();
 
         /// <summary>
         /// Registers a timer to be managed by this state manager
@@ -171,5 +172,29 @@ namespace IngameScript
         /// Gets the count of registered broadcast controllers
         /// </summary>
         public int RegisteredBroadcastControllerCount => _broadcastControllers.Count;
+
+        /// <summary>
+        /// Gets all registered timers
+        /// </summary>
+        public List<Timer> GetTimers()
+        {
+            return _timers;
+        }
+
+        /// <summary>
+        /// Gets all registered action relays
+        /// </summary>
+        public List<ActionRelay> GetActionRelays()
+        {
+            return _actionRelays;
+        }
+
+        /// <summary>
+        /// Gets all registered broadcast controllers
+        /// </summary>
+        public List<BroadcastController> GetBroadcastControllers()
+        {
+            return _broadcastControllers;
+        }
     }
 }

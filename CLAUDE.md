@@ -52,6 +52,15 @@ This project has specialized subagents available for specific tasks. **Use these
 - Extract complex logic into well-named helper methods
 - Maintain consistency with existing code style and naming conventions
 
+### Performance Optimization Patterns
+
+When working with rendering or frequently-executed code:
+
+1. **Extract Shared Logic**: Move repeated calculations to shared utility classes (e.g., `RenderHelpers.cs`)
+2. **Cached State Calculations**: Calculate rendering states once and reuse them across multiple draw operations
+3. **Avoid Redundant Calculations**: Cache values that don't change between frames when possible
+4. **Struct-Based State**: Use lightweight structs for temporary state data to avoid heap allocations
+
 ### Sprite Creation Pattern
 
 When creating sprites in rendering classes (e.g., `SpriteRenderer`, `PlotLCDRenderer`), always use inline sprite creation without intermediate variables:
@@ -148,15 +157,19 @@ The project follows a component-based architecture with a base `Block` class tha
 - **Block.cs**: Abstract base class for all block types with custom data management
 - **Component Classes**: Specialized wrappers for different Space Engineers block types
   - `FarmPlot.cs`: Manages agricultural plots with plant monitoring and lighting
+  - `SolarFoodGenerator.cs`: Manages algae farm blocks for food generation
   - `IrrigationSystem.cs`: Handles water/ice management systems
   - `LcdPanel.cs`: Controls text display panels
   - `Cockpit.cs`: Controls cockpit displays with multiple screens
   - `AirVent.cs`: Monitors atmospheric conditions
   - `ProgrammableBlock.cs`: Self-referential block for configuration
   - `Timer.cs`: Event-driven timer automation with state-based triggering
+  - `ActionRelay.cs`: Channel-based event signaling using transponder blocks
+  - `BroadcastController.cs`: Chat message broadcasting for event notifications
 - **Support Classes**: Core system management components
   - `StateManager.cs`: State change detection and timer event coordination
   - `FarmGroups.cs`: Group management for organizing blocks by farm groups
+  - `RenderHelpers.cs`: Shared rendering utilities and cached state calculations
 
 ### Key Design Patterns
 
@@ -178,17 +191,24 @@ The project uses Space Engineers' custom data feature for configuration. All blo
 
 The project implements a sophisticated event-driven automation system using Timer blocks and StateManager:
 
-#### Timer Event Configuration
+#### Event-Driven Automation Components
 
-Timer blocks support multiple event triggers configured via custom data:
+The system supports three types of event-driven automation blocks:
+
+1. **Timer Blocks** (`Timer.cs`): Traditional countdown/trigger automation
+2. **Action Relays** (`ActionRelay.cs`): Transponder blocks that signal on specific channels (1-100)
+3. **Broadcast Controllers** (`BroadcastController.cs`): Blocks that send chat messages for events
+
+All three support the same event triggers configured via custom data:
 - **OnWaterLowTrue/False**: Responds to farm plot water levels
 - **OnIceLowTrue/False**: Responds to irrigation system ice levels
 - **OnPressurizedTrue/False**: Responds to air vent pressure changes
 - **OnCropReadyTrue/False**: Responds to harvest-ready crops (any crop ready)
 - **OnAllCropsReadyTrue/False**: Responds when all planted crops are ready for harvest
+- **OnCropDyingTrue/False**: Responds when crop health drops below threshold
 - **OnCropDeadTrue/False**: Responds to dead crops
 - **OnCropAvailableTrue/False**: Responds to crops available for harvest
-- **TriggerNow**: Controls immediate vs. countdown triggering
+- **TriggerNow** (Timer only): Controls immediate vs. countdown triggering
 
 #### State Change Detection
 
@@ -266,6 +286,13 @@ Farm plots use integrated lighting to indicate status:
 - **Cyan + Blinking**: Ready to harvest
 - **Red**: Dead plant
 - **Fast Blinking**: Low water warning
+
+### Algae Farm Support
+
+The script supports algae farms (Solar Food Generators) in addition to traditional farm plots:
+- Monitors food production rate and time remaining until next batch
+- Displays algae farm statistics on LCD panels
+- Integrates with the overall farm management system
 
 ### Key Space Engineers API Documentation
 

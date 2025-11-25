@@ -45,8 +45,15 @@ namespace IngameScript
         /// <summary>
         /// Main execution loop called every 10 ticks by Space Engineers
         /// </summary>
-        public void Main()
+        public void Main(string argument)
         {
+            // Handle cleanup command
+            if (!string.IsNullOrWhiteSpace(argument) && argument.Trim().ToLower() == "cleanup")
+            {
+                CleanupAllCustomData();
+                return;
+            }
+
             // Build step queue when starting a new cycle
             if (currentStepIndex >= stepQueue.Count)
             {
@@ -898,6 +905,90 @@ namespace IngameScript
         void WriteToDiagnosticOutput(string text, bool header = false)
         {
             thisPb.AppendText(text, header);
+        }
+
+        /// <summary>
+        /// Cleans up obsolete custom data from all managed blocks
+        /// </summary>
+        void CleanupAllCustomData()
+        {
+            Echo("Starting custom data cleanup...");
+            int blocksProcessed = 0;
+
+            // Process all farm groups
+            var allGroups = farmGroups.GetAllGroups();
+            foreach (var farmGroup in allGroups)
+            {
+                // Clean farm plots
+                foreach (var block in farmGroup.FarmPlots)
+                {
+                    block.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean irrigation systems
+                foreach (var block in farmGroup.IrrigationSystems)
+                {
+                    block.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean LCD panels
+                foreach (var block in farmGroup.LcdPanels)
+                {
+                    block.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean cockpits
+                foreach (var block in farmGroup.Cockpits)
+                {
+                    block.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean air vents
+                foreach (var block in farmGroup.AirVents)
+                {
+                    block.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean solar food generators
+                foreach (var block in farmGroup.SolarFoodGenerators)
+                {
+                    block.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean timers
+                foreach (var timer in farmGroup.StateManager.GetTimers())
+                {
+                    timer.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean action relays
+                foreach (var relay in farmGroup.StateManager.GetActionRelays())
+                {
+                    relay.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean broadcast controllers
+                foreach (var controller in farmGroup.StateManager.GetBroadcastControllers())
+                {
+                    controller.CleanupCustomData();
+                    blocksProcessed++;
+                }
+            }
+
+            // Clean programmable block
+            thisPb.CleanupCustomData();
+            blocksProcessed++;
+
+            Echo($"Custom data cleanup complete!");
+            Echo($"Processed {blocksProcessed} blocks.");
         }
     }
 }

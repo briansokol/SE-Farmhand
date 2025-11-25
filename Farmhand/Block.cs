@@ -127,6 +127,49 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Removes obsolete custom data keys that are not valid for this block type
+        /// </summary>
+        public void CleanupCustomData()
+        {
+            // Skip blocks with no custom data configuration
+            if (CustomDataConfigs == null || CustomDataConfigs.Count == 0 || !IsFunctional())
+            {
+                return;
+            }
+
+            // Parse existing custom data
+            ParseCustomData();
+
+            // Get all keys in the Farmhand section
+            List<MyIniKey> keys = new List<MyIniKey>();
+            _customData.GetKeys(_customDataHeader, keys);
+
+            // Build a set of valid labels for this block type
+            HashSet<string> validLabels = new HashSet<string>();
+            foreach (KeyValuePair<string, CustomDataConfig> entry in CustomDataConfigs)
+            {
+                validLabels.Add(entry.Value.Label);
+            }
+
+            // Remove keys that are not in the valid set
+            bool changed = false;
+            foreach (MyIniKey key in keys)
+            {
+                if (!validLabels.Contains(key.Name))
+                {
+                    _customData.Delete(_customDataHeader, key.Name);
+                    changed = true;
+                }
+            }
+
+            // Write back to block if changes were made
+            if (changed)
+            {
+                BlockInstance.CustomData = _customData.ToString();
+            }
+        }
+
+        /// <summary>
         /// Gets a string value from custom data by config key
         /// </summary>
         /// <param name="configKey">The key in CustomDataConfigs dictionary</param>
