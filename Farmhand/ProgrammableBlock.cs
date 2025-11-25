@@ -38,6 +38,14 @@ namespace IngameScript
                 )
             },
             {
+                "ControlFarmPlotLights",
+                new CustomDataConfig(
+                    "Control Farm Plot Lights",
+                    "true",
+                    "Enable automatic farm plot light control (set false if feature is buggy on your server)"
+                )
+            },
+            {
                 "PlanterEmptyColor",
                 new CustomDataConfig(
                     "Plot Empty Color",
@@ -322,6 +330,14 @@ namespace IngameScript
                 // Return default if parsing fails
                 return 1.0f;
             }
+        }
+
+        /// <summary>
+        /// Gets whether automatic farm plot light control is enabled
+        /// </summary>
+        public bool ControlFarmPlotLights
+        {
+            get { return GetCustomDataBool("ControlFarmPlotLights", true); }
         }
 
         /// <summary>
