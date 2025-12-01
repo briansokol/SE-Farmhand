@@ -465,7 +465,7 @@ namespace IngameScript
                                         farmPlot.LightBlinkLength = 50f;
                                     }
                                     stats.AlertMessages.Add(
-                                        $"Health Low: {plotDetails.CropHealth:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
+                                        $"Health Low: {plotDetails.CropHealth:P1} ({(string.IsNullOrEmpty(farmPlot.PlantType) ? "" : farmPlot.PlantType + ", ")}{farmPlot.CustomName})"
                                     );
                                     stats.DyingPlants++;
                                 }
@@ -546,7 +546,7 @@ namespace IngameScript
                                 farmPlot.LightBlinkLength = 50f;
                             }
                             stats.AlertMessages.Add(
-                                $"Water Low: {farmPlot.WaterFilledRatio:P1} ({farmPlot.PlantType}, {farmPlot.CustomName})"
+                                $"Water Low: {farmPlot.WaterFilledRatio:P1} ({(string.IsNullOrEmpty(farmPlot.PlantType) ? "" : farmPlot.PlantType + ", ")}{farmPlot.CustomName})"
                             );
                             stats.FarmPlotsLowOnWater++;
                         }
