@@ -13,6 +13,7 @@ namespace IngameScript
         public string GroupName { get; }
         public List<FarmPlot> FarmPlots { get; }
         public List<IrrigationSystem> IrrigationSystems { get; }
+        public List<WaterTank> WaterTanks { get; }
         public List<LcdPanel> LcdPanels { get; }
         public List<Cockpit> Cockpits { get; }
         public List<AirVent> AirVents { get; }
@@ -32,6 +33,7 @@ namespace IngameScript
             GroupName = groupName;
             FarmPlots = new List<FarmPlot>();
             IrrigationSystems = new List<IrrigationSystem>();
+            WaterTanks = new List<WaterTank>();
             LcdPanels = new List<LcdPanel>();
             Cockpits = new List<Cockpit>();
             AirVents = new List<AirVent>();
@@ -140,6 +142,22 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Discovers and registers water tanks for the specified group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group</param>
+        public void FindWaterTanks(string groupName)
+        {
+            var group = GetGroup(groupName);
+            IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+
+            group.WaterTanks.Clear();
+
+            List<IMyGasTank> validWaterTanks = new List<IMyGasTank>();
+            blockGroup?.GetBlocksOfType(validWaterTanks, block => WaterTank.BlockIsValid(block));
+            validWaterTanks.ForEach(block => group.WaterTanks.Add(new WaterTank(block, program)));
+        }
+
+        /// <summary>
         /// Discovers and registers air vents for the specified group
         /// </summary>
         /// <param name="groupName">Name of the farm group</param>
@@ -226,13 +244,16 @@ namespace IngameScript
 
             group.StateManager.ClearBroadcastControllers();
 
-            List<IMyBroadcastController> validBroadcastControllers = new List<IMyBroadcastController>();
+            List<IMyBroadcastController> validBroadcastControllers =
+                new List<IMyBroadcastController>();
             blockGroup?.GetBlocksOfType(
                 validBroadcastControllers,
                 block => BroadcastController.BlockIsValid(block)
             );
             validBroadcastControllers.ForEach(block =>
-                group.StateManager.RegisterBroadcastController(new BroadcastController(block, program))
+                group.StateManager.RegisterBroadcastController(
+                    new BroadcastController(block, program)
+                )
             );
         }
 

@@ -70,6 +70,14 @@ namespace IngameScript
                 )
             },
             {
+                "ShowWaterTanks",
+                new CustomDataConfig(
+                    "Show Water Tanks",
+                    "0",
+                    "Shows water tank (modded) status (set index of screen, false to hide)"
+                )
+            },
+            {
                 "ShowSolarFoodGenerators",
                 new CustomDataConfig(
                     "Show Solar Food Generators",

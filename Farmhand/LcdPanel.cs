@@ -60,6 +60,10 @@ namespace IngameScript
                 new CustomDataConfig("Show Irrigation", "true", "Shows irrigation system status")
             },
             {
+                "ShowWaterTanks",
+                new CustomDataConfig("Show Water Tanks", "true", "Shows water tank (modded) status")
+            },
+            {
                 "ShowSolarFoodGenerators",
                 new CustomDataConfig(
                     "Show Solar Food Generators",

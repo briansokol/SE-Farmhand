@@ -94,6 +94,14 @@ namespace IngameScript
                 )
             },
             {
+                "WaterTankLowThreshold",
+                new CustomDataConfig(
+                    "Water Tank Low Threshold",
+                    "0.2",
+                    "Low water tank percent threshold, between 0.0 and 1.0 (default: 0.2)"
+                )
+            },
+            {
                 "WaterLowThreshold",
                 new CustomDataConfig(
                     "Water Low Threshold",
@@ -274,6 +282,29 @@ namespace IngameScript
                 var thresholdString = _customData
                     .Get(_customDataHeader, _customDataConfigs["IceLowThreshold"].Label)
                     .ToString(_customDataConfigs["IceLowThreshold"].DefaultValue);
+
+                float threshold;
+                if (float.TryParse(thresholdString, out threshold))
+                {
+                    // Clamp between 0.0 and 1.0
+                    return Math.Max(0.0f, Math.Min(1.0f, threshold));
+                }
+                // Return default if parsing fails
+                return 0.2f;
+            }
+        }
+
+        /// <summary>
+        /// Gets the water tank low threshold percentage
+        /// </summary>
+        public float WaterTankLowThreshold
+        {
+            get
+            {
+                ParseCustomData();
+                var thresholdString = _customData
+                    .Get(_customDataHeader, _customDataConfigs["WaterTankLowThreshold"].Label)
+                    .ToString(_customDataConfigs["WaterTankLowThreshold"].DefaultValue);
 
                 float threshold;
                 if (float.TryParse(thresholdString, out threshold))

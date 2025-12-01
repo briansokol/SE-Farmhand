@@ -93,6 +93,21 @@ namespace IngameScript
         public float MaxIceKg { get; set; }
 
         /// <summary>
+        /// Water volume ratio in water tanks (0.0 to 1.0)
+        /// </summary>
+        public float WaterRatio { get; set; }
+
+        /// <summary>
+        /// Current volume of water in liters
+        /// </summary>
+        public float CurrentWaterL { get; set; }
+
+        /// <summary>
+        /// Max volume of water in liters
+        /// </summary>
+        public float MaxWaterL { get; set; }
+
+        /// <summary>
         /// Total food production rate in items per minute across all solar food generators
         /// </summary>
         public float TotalFoodItemsPerMinute { get; set; }
@@ -129,6 +144,11 @@ namespace IngameScript
             OxygenLevel = 0f;
             VentStatusText = "";
             IceRatio = 0f;
+            CurrentIceKg = 0f;
+            MaxIceKg = 0f;
+            WaterRatio = 0f;
+            CurrentWaterL = 0f;
+            MaxWaterL = 0f;
             TotalFoodItemsPerMinute = 0f;
             MinTimeRemainingUntilNextBatch = 0f;
         }

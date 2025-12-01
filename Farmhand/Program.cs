@@ -18,8 +18,8 @@ namespace IngameScript
         readonly string plotLcdTag = "PlotLCD";
         readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
-        readonly string Version = "v1.0.0";
-        readonly string PublishedDate = "2025-11-25";
+        readonly string Version = "v1.1.0";
+        readonly string PublishedDate = "2025-12-01";
 
         // Step-based state machine management
         delegate void Step();
@@ -212,6 +212,10 @@ namespace IngameScript
                             $"Irrigation Systems: {farmGroup.IrrigationSystems.Count}"
                         );
                     }
+                    if (farmGroup.WaterTanks.Count > 0)
+                    {
+                        WriteToDiagnosticOutput($"Water Tanks: {farmGroup.WaterTanks.Count}");
+                    }
                     if (farmGroup.LcdPanels.Count > 0)
                     {
                         WriteToDiagnosticOutput($"LCD Panels: {farmGroup.LcdPanels.Count}");
@@ -337,6 +341,7 @@ namespace IngameScript
 
                 farmGroups.FindFarmPlots(groupName);
                 farmGroups.FindIrrigationSystems(groupName);
+                farmGroups.FindWaterTanks(groupName);
                 farmGroups.FindAirVents(groupName);
                 farmGroups.FindSolarFoodGenerators(groupName);
                 farmGroups.FindTimers(groupName);
@@ -622,6 +627,30 @@ namespace IngameScript
                         );
                     }
 
+                    // Check water tanks
+                    if (farmGroup.WaterTanks.Count > 0)
+                    {
+                        double waterVolume = 0.0;
+                        double maxWaterVolume = 0.0;
+
+                        farmGroup.WaterTanks.ForEach(waterTank =>
+                        {
+                            waterVolume += waterTank.CurrentVolume;
+                            maxWaterVolume += waterTank.MaxVolume;
+                        });
+
+                        var waterTankLowThreshold = thisPb.WaterTankLowThreshold;
+                        stats.WaterRatio =
+                            maxWaterVolume > 0 ? (float)(waterVolume / maxWaterVolume) : 0f;
+                        stats.CurrentWaterL = (float)waterVolume;
+                        stats.MaxWaterL = (float)maxWaterVolume;
+
+                        farmGroup.StateManager.UpdateState(
+                            "OnWaterTankLow",
+                            stats.WaterRatio < waterTankLowThreshold
+                        );
+                    }
+
                     // Check solar food generators
                     if (farmGroup.SolarFoodGenerators.Count > 0)
                     {
@@ -712,6 +741,15 @@ namespace IngameScript
                 else
                 {
                     stats.AlertMessages.Add("No Working Irrigation Systems!");
+                }
+
+                var waterTankMessages = new List<string>();
+
+                if (farmGroup.WaterTanks.Count > 0)
+                {
+                    waterTankMessages.Add(
+                        $"Water: {stats.WaterRatio:P0} ({stats.CurrentWaterL:F1} L / {stats.MaxWaterL:F1} L)"
+                    );
                 }
 
                 if (farmGroup.SolarFoodGenerators.Count > 0)
@@ -807,6 +845,15 @@ namespace IngameScript
                         WriteToMainOutput(groupName, message, "ShowIrrigation")
                     );
                     WriteToMainOutput(groupName, "", "ShowIrrigation");
+                }
+
+                if (waterTankMessages.Count > 0)
+                {
+                    WriteToMainOutput(groupName, "Water Tanks", "ShowWaterTanks", isHeader: true);
+                    waterTankMessages.ForEach(message =>
+                        WriteToMainOutput(groupName, message, "ShowWaterTanks")
+                    );
+                    WriteToMainOutput(groupName, "", "ShowWaterTanks");
                 }
 
                 if (solarFoodGeneratorMessages.Count > 0)
@@ -953,6 +1000,13 @@ namespace IngameScript
 
                 // Clean irrigation systems
                 foreach (var block in farmGroup.IrrigationSystems)
+                {
+                    block.CleanupCustomData();
+                    blocksProcessed++;
+                }
+
+                // Clean water tanks
+                foreach (var block in farmGroup.WaterTanks)
                 {
                     block.CleanupCustomData();
                     blocksProcessed++;
