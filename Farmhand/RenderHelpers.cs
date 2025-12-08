@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
 using VRageMath;
 
@@ -17,6 +19,60 @@ namespace IngameScript
             public Color OutlineColor;
             public Color ProgressBarColor;
             public Color WaterBarColor;
+        }
+
+        /// <summary>
+        /// Global sprite list cache (lazy initialization - populated on first use)
+        /// </summary>
+        private static List<string> _availableSprites = null;
+
+        /// <summary>
+        /// Resolves a plant sprite to use ColorfulIcons mod version if available
+        /// </summary>
+        /// <param name="plantId">Original plant ID (e.g., "MyObjectBuilder_Seed/Wheat")</param>
+        /// <param name="surface">Text surface to retrieve sprite list (only used on first call)</param>
+        /// <returns>ColorfulIcons sprite path if available, otherwise original plantId</returns>
+        public static string ResolveColorfulIconSprite(string plantId, IMyTextSurface surface)
+        {
+            // Return early for invalid input
+            if (string.IsNullOrEmpty(plantId))
+            {
+                return string.Empty;
+            }
+
+            // Initialize sprite cache on first use (only happens once)
+            if (_availableSprites == null)
+            {
+                _availableSprites = new List<string>();
+                if (surface != null)
+                {
+                    surface.GetSprites(_availableSprites);
+                }
+            }
+
+            // Only transform if it's a MyObjectBuilder type
+            if (!plantId.StartsWith("MyObjectBuilder_"))
+            {
+                return plantId;
+            }
+
+            // If no sprites available, return original
+            if (_availableSprites.Count == 0)
+            {
+                return plantId;
+            }
+
+            // Transform to ColorfulIcons path
+            var colorfulPath = plantId.Replace("MyObjectBuilder_", "ColorfulIcons_");
+
+            // Check if ColorfulIcons version exists
+            if (_availableSprites.Contains(colorfulPath))
+            {
+                return colorfulPath;
+            }
+
+            // Fallback to original
+            return plantId;
         }
 
         /// <summary>

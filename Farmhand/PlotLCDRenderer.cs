@@ -295,7 +295,7 @@ namespace IngameScript
                 new MySprite()
                 {
                     Type = SpriteType.TEXTURE,
-                    Data = farmPlot.PlantId,
+                    Data = RenderHelpers.ResolveColorfulIconSprite(farmPlot.PlantId, _surface),
                     Position = CreatePosition(x, y),
                     Size = new Vector2(ICON_SIZE, ICON_SIZE),
                     Alignment = TextAlignment.CENTER,
