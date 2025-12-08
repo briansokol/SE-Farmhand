@@ -33,6 +33,22 @@ namespace IngameScript
                 )
             },
             {
+                "OnWaterTankLowTrue",
+                new CustomDataConfig(
+                    "On Water Tank Low",
+                    "0",
+                    "Channel (1-100) to signal when water tanks' water level is low. 0 = disabled"
+                )
+            },
+            {
+                "OnWaterTankLowFalse",
+                new CustomDataConfig(
+                    "On Water Tank Not Low",
+                    "0",
+                    "Channel (1-100) to signal when water tanks' water levels are no longer low. 0 = disabled"
+                )
+            },
+            {
                 "OnIceLowTrue",
                 new CustomDataConfig(
                     "On Ice Low",

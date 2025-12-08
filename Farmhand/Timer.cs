@@ -43,6 +43,22 @@ namespace IngameScript
                 )
             },
             {
+                "OnWaterTankLowTrue",
+                new CustomDataConfig(
+                    "On Water Tank Low",
+                    "false",
+                    "Triggers when water tanks' water level is low"
+                )
+            },
+            {
+                "OnWaterTankLowFalse",
+                new CustomDataConfig(
+                    "On Water Tank Not Low",
+                    "false",
+                    "Triggers when water tanks' water levels are no longer low"
+                )
+            },
+            {
                 "OnIceLowTrue",
                 new CustomDataConfig(
                     "On Ice Low",

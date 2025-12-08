@@ -501,7 +501,10 @@ namespace IngameScript
                         new MySprite()
                         {
                             Type = SpriteType.TEXTURE,
-                            Data = RenderHelpers.ResolveColorfulIconSprite(plots[0].PlantId, _surface),
+                            Data = RenderHelpers.ResolveColorfulIconSprite(
+                                plots[0].PlantId,
+                                _surface
+                            ),
                             Position = CreatePosition(iconX, iconY),
                             Size = new Vector2(_iconSize, _iconSize),
                             Alignment = TextAlignment.CENTER,

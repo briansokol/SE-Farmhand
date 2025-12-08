@@ -94,19 +94,19 @@ namespace IngameScript
                 )
             },
             {
+                "WaterLowThreshold",
+                new CustomDataConfig(
+                    "Water Low Threshold",
+                    "0.5",
+                    "Low farm plot water percent threshold, between 0.0 and 1.0 (default: 0.5)"
+                )
+            },
+            {
                 "WaterTankLowThreshold",
                 new CustomDataConfig(
                     "Water Tank Low Threshold",
                     "0.2",
                     "Low water tank percent threshold, between 0.0 and 1.0 (default: 0.2)"
-                )
-            },
-            {
-                "WaterLowThreshold",
-                new CustomDataConfig(
-                    "Water Low Threshold",
-                    "0.5",
-                    "Low water percent threshold, between 0.0 and 1.0 (default: 0.5)"
                 )
             },
             {

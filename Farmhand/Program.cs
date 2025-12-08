@@ -18,8 +18,8 @@ namespace IngameScript
         readonly string plotLcdTag = "PlotLCD";
         readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
-        readonly string Version = "v1.1.1";
-        readonly string PublishedDate = "2025-12-02";
+        readonly string Version = "v1.2.0";
+        readonly string PublishedDate = "2025-12-08";
 
         // Step-based state machine management
         delegate void Step();
@@ -650,6 +650,11 @@ namespace IngameScript
                             stats.WaterRatio < waterTankLowThreshold
                         );
                     }
+                    else
+                    {
+                        // No water tanks in group - ensure state is false to prevent spurious events
+                        farmGroup.StateManager.UpdateState("OnWaterTankLow", false);
+                    }
 
                     // Check solar food generators
                     if (farmGroup.SolarFoodGenerators.Count > 0)
@@ -748,7 +753,7 @@ namespace IngameScript
                 if (farmGroup.WaterTanks.Count > 0)
                 {
                     waterTankMessages.Add(
-                        $"Water: {stats.WaterRatio:P0} ({stats.CurrentWaterL:F1} L / {stats.MaxWaterL:F1} L)"
+                        $"Water: {stats.WaterRatio:P1} ({stats.CurrentWaterL:F1} L / {stats.MaxWaterL:F1} L)"
                     );
                 }
 
