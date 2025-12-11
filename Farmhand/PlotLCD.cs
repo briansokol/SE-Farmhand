@@ -85,7 +85,7 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Attempts to find nearby farm plots on the left and right sides, or falls back to behind/above/below
+        /// Attempts to find nearby farm plots behind/above/below first, or falls back to left/right sides
         /// </summary>
         public void FindNearbyFarmPlot()
         {
@@ -103,92 +103,93 @@ namespace IngameScript
             var lcdPosition = _lcdPanel.Position;
             var orientation = _lcdPanel.Orientation;
 
-            // Corner LCD Top is upside down, so right and left are swapped
-            var isCornerLcdTop = _lcdPanel.BlockDefinition.SubtypeName.EndsWith(
-                "BlockCorner_LCD_1"
-            );
+            // Primary search: behind, above, below
+            // Get the forward vector (behind the LCD)
+            // Using up because the LCDs are rotated such that up is their forward
+            Base6Directions.Direction forwardDir = orientation.Up;
+            Vector3I forwardOffset = -1 * Base6Directions.GetIntVector(forwardDir);
 
-            // The corner LCDs are essentially laying on their face,
-            // So we need to adjust our search directions accordingly.
-            // Their down is forward and their forward is up.
+            // Get the up and down vectors
+            // Using forward because the LCDs are rotated such that forward is "down" on the screen
+            Base6Directions.Direction downDir = orientation.Forward;
+            Vector3I downOffset = Base6Directions.GetIntVector(downDir);
+            Vector3I upOffset = -downOffset;
 
-            // Get left and right vectors
-            // Using left because the LCDs are rotated
-            Base6Directions.Direction leftDir = orientation.Left;
-            Vector3I leftOffset = isCornerLcdTop
-                ? -1 * Base6Directions.GetIntVector(leftDir)
-                : Base6Directions.GetIntVector(leftDir);
-            Vector3I rightOffset = -leftOffset;
-
-            // Check left position
-            var leftPos = lcdPosition + leftOffset;
-            var leftBlock = grid.GetCubeBlock(leftPos);
-            if (leftBlock != null && leftBlock.FatBlock != null)
+            // Check three positions: behind, above, below
+            Vector3I[] searchPositions = new Vector3I[]
             {
-                var terminalBlock = leftBlock.FatBlock as IMyTerminalBlock;
-                if (
-                    terminalBlock != null
-                    && FarmPlot.BlockIsValid(terminalBlock as IMyFunctionalBlock)
-                )
+                lcdPosition + forwardOffset, // Behind
+                lcdPosition + upOffset, // Above
+                lcdPosition + downOffset, // Below
+            };
+
+            foreach (var searchPos in searchPositions)
+            {
+                var block = grid.GetCubeBlock(searchPos);
+                if (block != null && block.FatBlock != null)
                 {
-                    _leftFarmPlot = new FarmPlot(terminalBlock as IMyFunctionalBlock, _program);
+                    var terminalBlock = block.FatBlock as IMyTerminalBlock;
+                    if (
+                        terminalBlock != null
+                        && FarmPlot.BlockIsValid(terminalBlock as IMyFunctionalBlock)
+                    )
+                    {
+                        _leftFarmPlot = new FarmPlot(terminalBlock as IMyFunctionalBlock, _program);
+                        return; // Found one, stop searching
+                    }
                 }
             }
 
-            // Check right position
-            var rightPos = lcdPosition + rightOffset;
-            var rightBlock = grid.GetCubeBlock(rightPos);
-            if (rightBlock != null && rightBlock.FatBlock != null)
-            {
-                var terminalBlock = rightBlock.FatBlock as IMyTerminalBlock;
-                if (
-                    terminalBlock != null
-                    && FarmPlot.BlockIsValid(terminalBlock as IMyFunctionalBlock)
-                )
-                {
-                    _rightFarmPlot = new FarmPlot(terminalBlock as IMyFunctionalBlock, _program);
-                }
-            }
-
-            // If no left/right plots found, fall back to behind/above/below search
+            // If no behind/above/below plots found, fall back to left/right search
             if (_leftFarmPlot == null && _rightFarmPlot == null)
             {
-                // Get the forward vector (behind the LCD)
-                // Using up because the LCDs are rotated such that up is their forward
-                Base6Directions.Direction forwardDir = orientation.Up;
-                Vector3I forwardOffset = -1 * Base6Directions.GetIntVector(forwardDir);
+                // Corner LCD Top is upside down, so right and left are swapped
+                var isCornerLcdTop = _lcdPanel.BlockDefinition.SubtypeName.EndsWith(
+                    "BlockCorner_LCD_1"
+                );
 
-                // Get the up and down vectors
-                // Using forward because the LCDs are rotated such that forward is "down" on the screen
-                Base6Directions.Direction downDir = orientation.Forward;
-                Vector3I downOffset = Base6Directions.GetIntVector(downDir);
-                Vector3I upOffset = -downOffset;
+                // The corner LCDs are essentially laying on their face,
+                // So we need to adjust our search directions accordingly.
+                // Their down is forward and their forward is up.
 
-                // Check three positions: behind, above, below
-                Vector3I[] searchPositions = new Vector3I[]
+                // Get left and right vectors
+                // Using left because the LCDs are rotated
+                Base6Directions.Direction leftDir = orientation.Left;
+                Vector3I leftOffset = isCornerLcdTop
+                    ? -1 * Base6Directions.GetIntVector(leftDir)
+                    : Base6Directions.GetIntVector(leftDir);
+                Vector3I rightOffset = -leftOffset;
+
+                // Check left position
+                var leftPos = lcdPosition + leftOffset;
+                var leftBlock = grid.GetCubeBlock(leftPos);
+                if (leftBlock != null && leftBlock.FatBlock != null)
                 {
-                    lcdPosition + forwardOffset, // Behind
-                    lcdPosition + upOffset, // Above
-                    lcdPosition + downOffset, // Below
-                };
-
-                foreach (var searchPos in searchPositions)
-                {
-                    var block = grid.GetCubeBlock(searchPos);
-                    if (block != null && block.FatBlock != null)
+                    var terminalBlock = leftBlock.FatBlock as IMyTerminalBlock;
+                    if (
+                        terminalBlock != null
+                        && FarmPlot.BlockIsValid(terminalBlock as IMyFunctionalBlock)
+                    )
                     {
-                        var terminalBlock = block.FatBlock as IMyTerminalBlock;
-                        if (
-                            terminalBlock != null
-                            && FarmPlot.BlockIsValid(terminalBlock as IMyFunctionalBlock)
-                        )
-                        {
-                            _leftFarmPlot = new FarmPlot(
-                                terminalBlock as IMyFunctionalBlock,
-                                _program
-                            );
-                            return; // Found one, stop searching
-                        }
+                        _leftFarmPlot = new FarmPlot(terminalBlock as IMyFunctionalBlock, _program);
+                    }
+                }
+
+                // Check right position
+                var rightPos = lcdPosition + rightOffset;
+                var rightBlock = grid.GetCubeBlock(rightPos);
+                if (rightBlock != null && rightBlock.FatBlock != null)
+                {
+                    var terminalBlock = rightBlock.FatBlock as IMyTerminalBlock;
+                    if (
+                        terminalBlock != null
+                        && FarmPlot.BlockIsValid(terminalBlock as IMyFunctionalBlock)
+                    )
+                    {
+                        _rightFarmPlot = new FarmPlot(
+                            terminalBlock as IMyFunctionalBlock,
+                            _program
+                        );
                     }
                 }
             }
