@@ -66,6 +66,9 @@ namespace IngameScript
             // Accumulate cycle time
             currentCycleTime += Runtime.TimeSinceLastRun.TotalMilliseconds;
 
+            Echo("Farmhand");
+            Echo($"{Version} | {PublishedDate}");
+            Echo("");
             Echo($"Instructions: {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
             Echo(
                 $"Quota: {(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2}"
@@ -193,7 +196,7 @@ namespace IngameScript
             }
 
             WriteToDiagnosticOutput(header, true);
-            WriteToDiagnosticOutput($"{Version} | ({PublishedDate})", true);
+            WriteToDiagnosticOutput($"{Version} | {PublishedDate}", true);
             WriteToDiagnosticOutput("", true);
 
             // Print diagnostic info once per cycle
