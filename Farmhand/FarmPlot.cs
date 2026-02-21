@@ -179,6 +179,9 @@ namespace IngameScript
             }
 
             var details = new FarmPlotDetails();
+            // Percentage values appear in order: [0] Growth Progress, [1] Crop Health
+            // Parsing by value format rather than key name to support non-English game languages
+            var percentageValues = new List<float>();
             string[] lines = detailsText.Split('\n');
 
             foreach (string line in lines)
@@ -210,63 +213,52 @@ namespace IngameScript
                     continue;
                 }
 
-                string key = trimmedLine.Substring(0, colonIndex).Trim();
                 string value = trimmedLine.Substring(colonIndex + 1).Trim();
 
-                switch (key)
+                if (value.EndsWith("%"))
                 {
-                    case "Growth Progress":
-                        // Parse "100.00%" -> 100.0
-                        value = value.Replace("%", "");
-                        float growthProgress;
-                        if (float.TryParse(value, out growthProgress))
-                        {
-                            details.GrowthProgress = growthProgress / 100f; // Convert to 0.0 to 1.0 range
-                        }
-                        break;
-
-                    case "Grow Time":
-                        // Parse "00:30:00" -> TimeSpan
-                        TimeSpan growTime;
-                        if (TimeSpan.TryParse(value, out growTime))
-                        {
-                            details.GrowTime = growTime;
-                        }
-                        break;
-
-                    case "Crop Health":
-                        // Parse "100.00%" -> 100.0
-                        value = value.Replace("%", "");
-                        float cropHealth;
-                        if (float.TryParse(value, out cropHealth))
-                        {
-                            details.CropHealth = cropHealth / 100f; // Convert to 0.0 to 1.0 range
-                        }
-                        break;
-
-                    case "Current Water Usage":
-                        // Parse "1.6 L/min" -> 1.6
+                    // Growth Progress or Crop Health — collected in order of appearance
+                    string numStr = value.Substring(0, value.Length - 1).Trim();
+                    float pct;
+                    if (float.TryParse(numStr, System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out pct))
+                    {
+                        percentageValues.Add(pct / 100f);
+                    }
+                }
+                else
+                {
+                    TimeSpan growTime;
+                    if (TimeSpan.TryParse(value, out growTime))
+                    {
+                        // Grow Time: "00:30:00"
+                        details.GrowTime = growTime;
+                    }
+                    else
+                    {
                         int spaceIndex = value.IndexOf(' ');
                         if (spaceIndex > 0)
                         {
+                            // Current Water Usage: "1.6 L/min" — parse the number before the unit
                             string numberPart = value.Substring(0, spaceIndex).Trim();
                             float waterUsage;
-                            if (float.TryParse(numberPart, out waterUsage))
+                            if (float.TryParse(numberPart, System.Globalization.NumberStyles.Float,
+                                    System.Globalization.CultureInfo.InvariantCulture, out waterUsage))
                             {
                                 details.WaterUsage = waterUsage;
                             }
                         }
-                        break;
-
-                    case "Cause of Death":
-                        details.CauseOfDeath = value;
-                        break;
-
-                    default:
-                        // Unknown key, ignore
-                        break;
+                        else if (!string.IsNullOrEmpty(value))
+                        {
+                            // Cause of Death: any remaining text value
+                            details.CauseOfDeath = value;
+                        }
+                    }
                 }
             }
+
+            if (percentageValues.Count > 0) details.GrowthProgress = percentageValues[0];
+            if (percentageValues.Count > 1) details.CropHealth = percentageValues[1];
 
             return details;
         }

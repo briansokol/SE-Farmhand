@@ -18,8 +18,8 @@ namespace IngameScript
         readonly string plotLcdTag = "PlotLCD";
         readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
-        readonly string Version = "v1.2.1";
-        readonly string PublishedDate = "2025-12-11";
+        readonly string Version = "v1.2.2";
+        readonly string PublishedDate = "2026-02-21";
 
         // Step-based state machine management
         delegate void Step();
