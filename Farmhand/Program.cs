@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Sandbox.ModAPI.Ingame;
+using SpaceEngineers.Game.Entities.Blocks;
 using SpaceEngineers.Game.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
 
@@ -18,8 +19,8 @@ namespace IngameScript
         readonly string plotLcdTag = "PlotLCD";
         readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
-        readonly string Version = "v1.2.2";
-        readonly string PublishedDate = "2026-02-21";
+        readonly string Version = "v1.3.0";
+        readonly string PublishedDate = "2026-03-22";
 
         // Step-based state machine management
         delegate void Step();
@@ -133,7 +134,7 @@ namespace IngameScript
             // Only print headers if we have FarmLCD displays
             bool hasFarmLcdDisplays = farmGroups
                 .GetAllGroups()
-                .Any(g => g.LcdPanels.Count > 0 || g.Cockpits.Count > 0);
+                .Any(g => g.LcdPanels.Count > 0 || g.TextSurfaceProviders.Count > 0);
 
             if (hasFarmLcdDisplays)
             {
@@ -149,7 +150,9 @@ namespace IngameScript
             // Render text displays if we have any text-mode LCDs or cockpits
             bool hasTextDisplays = farmGroups
                 .GetAllGroups()
-                .Any(g => g.LcdPanels.Any(p => !p.IsGraphicalMode()) || g.Cockpits.Count > 0);
+                .Any(g =>
+                    g.LcdPanels.Any(p => !p.IsGraphicalMode()) || g.TextSurfaceProviders.Count > 0
+                );
 
             if (hasTextDisplays)
             {
@@ -219,13 +222,11 @@ namespace IngameScript
                     {
                         WriteToDiagnosticOutput($"Water Tanks: {farmGroup.WaterTanks.Count}");
                     }
-                    if (farmGroup.LcdPanels.Count > 0)
+                    var displayCount =
+                        farmGroup.LcdPanels.Count + farmGroup.TextSurfaceProviders.Count;
+                    if (displayCount > 0)
                     {
-                        WriteToDiagnosticOutput($"LCD Panels: {farmGroup.LcdPanels.Count}");
-                    }
-                    if (farmGroup.Cockpits.Count > 0)
-                    {
-                        WriteToDiagnosticOutput($"Control Seats: {farmGroup.Cockpits.Count}");
+                        WriteToDiagnosticOutput($"LCD Screen Providers: {displayCount}");
                     }
                     if (farmGroup.AirVents.Count > 0)
                     {
@@ -290,7 +291,7 @@ namespace IngameScript
         void FindFarmLCDBlocks()
         {
             var lcdPanels = new List<LcdPanel>();
-            var cockpits = new List<Cockpit>();
+            var surfaceProviders = new List<TextSurfaceProvider>();
 
             // Find the blocks with [FarmLCD] in their custom name
             List<IMyTerminalBlock> lcdTaggedBlocks = new List<IMyTerminalBlock>();
@@ -298,9 +299,9 @@ namespace IngameScript
 
             lcdTaggedBlocks.ForEach(block =>
             {
-                if (Cockpit.BlockIsValid(block))
+                if (TextSurfaceProvider.BlockIsValid(block))
                 {
-                    cockpits.Add(new Cockpit(block as IMyCockpit, this, shiftSprites));
+                    surfaceProviders.Add(new TextSurfaceProvider(block, this, shiftSprites));
                 }
                 else if (LcdPanel.BlockIsValid(block as IMyFunctionalBlock))
                 {
@@ -314,11 +315,11 @@ namespace IngameScript
                 .Distinct()
                 .ToList();
 
-            var cockpitGroupNames = cockpits
-                .ConvertAll(cockpit => cockpit.GroupName())
+            var surfaceProviderGroupNames = surfaceProviders
+                .ConvertAll(provider => provider.GroupName())
                 .FindAll(name => !string.IsNullOrWhiteSpace(name));
 
-            groupNames.AddRange(cockpitGroupNames);
+            groupNames.AddRange(surfaceProviderGroupNames);
             groupNames = groupNames.Distinct().ToList();
 
             // Get group name from this programmable block if set
@@ -335,8 +336,10 @@ namespace IngameScript
             foreach (var groupName in groupNames)
             {
                 var lcdPanelsInGroup = lcdPanels.FindAll(panel => panel.GroupName() == groupName);
-                var cockpitsInGroup = cockpits.FindAll(cockpit => cockpit.GroupName() == groupName);
-                farmGroups.ResetBlocks(groupName, lcdPanelsInGroup, cockpitsInGroup);
+                var surfaceProvidersInGroup = surfaceProviders.FindAll(provider =>
+                    provider.GroupName() == groupName
+                );
+                farmGroups.ResetBlocks(groupName, lcdPanelsInGroup, surfaceProvidersInGroup);
 
                 var group = farmGroups.GetGroup(groupName);
                 group.ProgrammableBlock = thisPb;
@@ -910,10 +913,10 @@ namespace IngameScript
                 }
 
                 // Process cockpits (always text mode)
-                farmGroup.Cockpits.ForEach(cockpit =>
+                farmGroup.TextSurfaceProviders.ForEach(provider =>
                 {
-                    cockpit.SetFarmGroup(farmGroup);
-                    cockpit.FlushTextToScreens();
+                    provider.SetFarmGroup(farmGroup);
+                    provider.FlushTextToScreens();
                 });
             }
         }
@@ -972,9 +975,9 @@ namespace IngameScript
                 panel.AppendText(text, category, isHeader, runNumber);
             });
 
-            group.Cockpits.ForEach(cockpit =>
+            group.TextSurfaceProviders.ForEach(provider =>
             {
-                cockpit.AppendText(text, category, isHeader, runNumber);
+                provider.AppendText(text, category, isHeader, runNumber);
             });
         }
 
@@ -1027,8 +1030,8 @@ namespace IngameScript
                     blocksProcessed++;
                 }
 
-                // Clean cockpits
-                foreach (var block in farmGroup.Cockpits)
+                // Clean text surface providers
+                foreach (var block in farmGroup.TextSurfaceProviders)
                 {
                     block.CleanupCustomData();
                     blocksProcessed++;

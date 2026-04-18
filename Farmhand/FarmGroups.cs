@@ -15,7 +15,7 @@ namespace IngameScript
         public List<IrrigationSystem> IrrigationSystems { get; }
         public List<WaterTank> WaterTanks { get; }
         public List<LcdPanel> LcdPanels { get; }
-        public List<Cockpit> Cockpits { get; }
+        public List<TextSurfaceProvider> TextSurfaceProviders { get; }
         public List<AirVent> AirVents { get; }
         public List<SolarFoodGenerator> SolarFoodGenerators { get; }
         public List<BroadcastController> BroadcastControllers { get; }
@@ -35,7 +35,7 @@ namespace IngameScript
             IrrigationSystems = new List<IrrigationSystem>();
             WaterTanks = new List<WaterTank>();
             LcdPanels = new List<LcdPanel>();
-            Cockpits = new List<Cockpit>();
+            TextSurfaceProviders = new List<TextSurfaceProvider>();
             AirVents = new List<AirVent>();
             SolarFoodGenerators = new List<SolarFoodGenerator>();
             BroadcastControllers = new List<BroadcastController>();
@@ -93,15 +93,15 @@ namespace IngameScript
         /// <param name="groupName">Name of the farm group</param>
         /// <param name="lcdPanels">LCD panels to add to the group</param>
         /// <param name="cockpits">Cockpits to add to the group</param>
-        public void ResetBlocks(string groupName, List<LcdPanel> lcdPanels, List<Cockpit> cockpits)
+        public void ResetBlocks(string groupName, List<LcdPanel> lcdPanels, List<TextSurfaceProvider> textSurfaceProviders)
         {
             var group = GetGroup(groupName);
 
             group.LcdPanels.Clear();
-            group.Cockpits.Clear();
+            group.TextSurfaceProviders.Clear();
 
             group.LcdPanels.AddRange(lcdPanels);
-            group.Cockpits.AddRange(cockpits);
+            group.TextSurfaceProviders.AddRange(textSurfaceProviders);
         }
 
         /// <summary>

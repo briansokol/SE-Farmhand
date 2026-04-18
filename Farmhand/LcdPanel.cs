@@ -2,7 +2,6 @@
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
-using VRageMath;
 
 namespace IngameScript
 {

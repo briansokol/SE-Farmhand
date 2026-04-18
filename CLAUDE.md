@@ -296,5 +296,5 @@ The script supports algae farms (Solar Food Generators) in addition to tradition
 
 ### Key Space Engineers API Documentation
 
-- [How to search for blocks on a grid](https://github.com/malware-dev/MDK-SE/wiki/The-Grid-Terminal-System)
-- [How to draw on a text surface with sprites](https://github.com/malware-dev/MDK-SE/wiki/Text-Panels-and-Drawing-Sprites)
+- **API Reference**: https://malforge.github.io/spaceengineers/pbapi/
+  - Look up any class by its full namespace + `.html` (e.g., `IMyTimerBlock` → https://malforge.github.io/spaceengineers/pbapi/SpaceEngineers.Game.ModAPI.Ingame.IMyTimerBlock.html)

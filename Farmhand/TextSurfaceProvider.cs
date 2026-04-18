@@ -1,19 +1,18 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
-using Sandbox.Common.ObjectBuilders.Definitions;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
-using VRageMath;
 
 namespace IngameScript
 {
     /// <summary>
-    /// Controls cockpit displays with multiple screens for categorized farm information output
+    /// Controls multi-screen block displays for categorized farm information output.
+    /// Works with any block implementing IMyTextSurfaceProvider (cockpits, control stations, etc.)
     /// </summary>
-    internal class Cockpit : Block
+    internal class TextSurfaceProvider : Block
     {
-        private readonly IMyCockpit _cockpit;
+        private readonly IMyTerminalBlock _block;
+        private readonly IMyTextSurfaceProvider _surfaceProvider;
         protected readonly List<StringBuilder> _lcdOutput = new List<StringBuilder>();
         private FarmGroup _farmGroup;
 
@@ -111,24 +110,25 @@ namespace IngameScript
             },
         };
 
-        public override IMyTerminalBlock BlockInstance => _cockpit;
+        public override IMyTerminalBlock BlockInstance => _block;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs =>
             _customDataConfigs;
 
         /// <summary>
-        /// Initializes a new instance of the Cockpit class
+        /// Initializes a new instance of the TextSurfaceProvider class
         /// </summary>
-        /// <param name="cockpit">The Space Engineers cockpit block to wrap</param>
+        /// <param name="block">The Space Engineers block implementing IMyTextSurfaceProvider</param>
         /// <param name="program">The parent grid program instance</param>
         /// <param name="shiftSprites">Whether to shift sprites for redraw on server clients</param>
-        public Cockpit(IMyCockpit cockpit, MyGridProgram program, bool shiftSprites)
+        public TextSurfaceProvider(IMyTerminalBlock block, MyGridProgram program, bool shiftSprites)
             : base(program)
         {
-            _cockpit = cockpit;
-            for (int i = 0; i < _cockpit.SurfaceCount; i++)
+            _block = block;
+            _surfaceProvider = block as IMyTextSurfaceProvider;
+            _shiftSprites = shiftSprites;
+            for (int i = 0; i < _surfaceProvider.SurfaceCount; i++)
             {
                 _lcdOutput.Add(new StringBuilder());
-                _shiftSprites = shiftSprites;
             }
             UpdateCustomData();
         }
@@ -165,7 +165,7 @@ namespace IngameScript
             int runNumber = 0
         )
         {
-            if (IsFunctional() && _cockpit != null)
+            if (IsFunctional() && _surfaceProvider != null)
             {
                 string outputText = text;
 
@@ -249,16 +249,16 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Flushes the accumulated text to the LCD panels and clears the buffer
+        /// Flushes the accumulated text to the screens and clears the buffers
         /// </summary>
         public void FlushTextToScreens()
         {
-            if (IsFunctional() && _cockpit != null)
+            if (IsFunctional() && _surfaceProvider != null)
             {
                 int graphicalScreen = GetGraphicalModeScreen();
 
                 // Handle graphical mode screen
-                if (graphicalScreen >= 0 && graphicalScreen < _cockpit.SurfaceCount)
+                if (graphicalScreen >= 0 && graphicalScreen < _surfaceProvider.SurfaceCount)
                 {
                     DrawGraphicalUI(graphicalScreen);
                     _lcdOutput[graphicalScreen].Clear();
@@ -269,7 +269,7 @@ namespace IngameScript
                 {
                     if (index != graphicalScreen)
                     {
-                        var screen = _cockpit.GetSurface(index);
+                        var screen = _surfaceProvider.GetSurface(index);
                         screen.ContentType = ContentType.TEXT_AND_IMAGE;
                         screen.Alignment = GetTextAlignment();
                         screen.WriteText(_lcdOutput[index].ToString(), false);
@@ -306,9 +306,9 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Sets the farm group for this cockpit (used to retrieve stats for graphical rendering)
+        /// Sets the farm group for this block (used to retrieve stats for graphical rendering)
         /// </summary>
-        /// <param name="farmGroup">The farm group this cockpit belongs to</param>
+        /// <param name="farmGroup">The farm group this block belongs to</param>
         public void SetFarmGroup(FarmGroup farmGroup)
         {
             _farmGroup = farmGroup;
@@ -320,7 +320,7 @@ namespace IngameScript
         /// <param name="screenIndex">Index of the screen to draw on</param>
         private void DrawGraphicalUI(int screenIndex)
         {
-            var screen = _cockpit.GetSurface(screenIndex);
+            var screen = _surfaceProvider.GetSurface(screenIndex);
             var renderer = new SpriteRenderer(screen, _farmGroup, GetTitle(), _shiftSprites);
             renderer.DrawGraphicalUI();
         }
@@ -385,14 +385,15 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Validates whether a block can be used as a cockpit
+        /// Validates whether a block can be used as a text surface provider
         /// </summary>
-        /// <param name="block">The cockpit block to validate</param>
-        /// <returns>True if the block can be used as a cockpit</returns>
+        /// <param name="block">The block to validate</param>
+        /// <returns>True if the block can be used as a text surface provider</returns>
         public static bool BlockIsValid(IMyTerminalBlock block)
         {
-            return block is IMyCockpit
-                && (block as IMyCockpit).SurfaceCount > 0
+            return !(block is IMyTextPanel)
+                && block is IMyTextSurfaceProvider
+                && (block as IMyTextSurfaceProvider).SurfaceCount > 0
                 && IsBlockValid(block);
         }
     }
