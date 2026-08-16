@@ -308,7 +308,8 @@ namespace IngameScript
                     .ToString(_customDataConfigs["IceLowThreshold"].DefaultValue);
 
                 float threshold;
-                if (float.TryParse(thresholdString, out threshold))
+                if (float.TryParse(thresholdString, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out threshold))
                 {
                     // Clamp between 0.0 and 1.0
                     return Math.Max(0.0f, Math.Min(1.0f, threshold));
@@ -331,7 +332,8 @@ namespace IngameScript
                     .ToString(_customDataConfigs["WaterTankLowThreshold"].DefaultValue);
 
                 float threshold;
-                if (float.TryParse(thresholdString, out threshold))
+                if (float.TryParse(thresholdString, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out threshold))
                 {
                     // Clamp between 0.0 and 1.0
                     return Math.Max(0.0f, Math.Min(1.0f, threshold));
@@ -354,7 +356,8 @@ namespace IngameScript
                     .ToString(_customDataConfigs["WaterLowThreshold"].DefaultValue);
 
                 float threshold;
-                if (float.TryParse(thresholdString, out threshold))
+                if (float.TryParse(thresholdString, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out threshold))
                 {
                     // Clamp between 0.0 and 1.0
                     return Math.Max(0.0f, Math.Min(1.0f, threshold));
@@ -377,7 +380,8 @@ namespace IngameScript
                     .ToString(_customDataConfigs["HealthLowThreshold"].DefaultValue);
 
                 float threshold;
-                if (float.TryParse(thresholdString, out threshold))
+                if (float.TryParse(thresholdString, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out threshold))
                 {
                     // Clamp between 0.0 and 1.0
                     return Math.Max(0.0f, Math.Min(1.0f, threshold));
