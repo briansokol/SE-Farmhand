@@ -172,15 +172,24 @@ namespace IngameScript
                 return null;
             }
 
-            string detailsText = _farmPlotLogic.GetDetailedInfoWithoutRequiredInput();
+            return ParsePlotDetails(_farmPlotLogic.GetDetailedInfoWithoutRequiredInput());
+        }
+
+        /// <summary>
+        /// Parses a farm plot's detailed-info text into a details object.
+        /// Values are identified by format rather than by key name so that non-English
+        /// game clients parse correctly. Percentage values appear in a fixed order:
+        /// index 0 is growth progress, index 1 is crop health.
+        /// Returns null when the input is null, empty, or whitespace.
+        /// </summary>
+        public static FarmPlotDetails ParsePlotDetails(string detailsText)
+        {
             if (string.IsNullOrWhiteSpace(detailsText))
             {
                 return null;
             }
 
             var details = new FarmPlotDetails();
-            // Percentage values appear in order: [0] Growth Progress, [1] Crop Health
-            // Parsing by value format rather than key name to support non-English game languages
             var percentageValues = new List<float>();
             string[] lines = detailsText.Split('\n');
 
@@ -217,7 +226,7 @@ namespace IngameScript
 
                 if (value.EndsWith("%"))
                 {
-                    // Growth Progress or Crop Health — collected in order of appearance
+                    // Growth Progress or Crop Health, collected in order of appearance
                     string numStr = value.Substring(0, value.Length - 1).Trim();
                     float pct;
                     if (float.TryParse(numStr, System.Globalization.NumberStyles.Float,
@@ -239,7 +248,7 @@ namespace IngameScript
                         int spaceIndex = value.IndexOf(' ');
                         if (spaceIndex > 0)
                         {
-                            // Current Water Usage: "1.6 L/min" — parse the number before the unit
+                            // Current Water Usage: "1.6 L/min", parse the number before the unit
                             string numberPart = value.Substring(0, spaceIndex).Trim();
                             float waterUsage;
                             if (float.TryParse(numberPart, System.Globalization.NumberStyles.Float,
@@ -250,7 +259,7 @@ namespace IngameScript
                         }
                         else if (!string.IsNullOrEmpty(value))
                         {
-                            // Cause of Death: any remaining text value
+                            // Cause of Death: any remaining single-token text value
                             details.CauseOfDeath = value;
                         }
                     }
