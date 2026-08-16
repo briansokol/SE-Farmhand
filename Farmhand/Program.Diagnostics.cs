@@ -53,7 +53,7 @@ namespace IngameScript
                 Echo("[PAUSED]");
             }
             Echo($"Step {_stepIndex + 1}/{StepLabels.Length}: {_stepLabel}");
-            Echo($"Cycle {CycleNumber} | {TicksLastCycle} ticks");
+            Echo($"{TicksLastCycle} ticks/cycle");
             Echo($"Instr {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
             Echo($"Peak {InstructionHighWater} (limit {(int)(Runtime.MaxInstructionCount * BudgetFraction)})");
             Echo($"Worst chunk {WorstChunkCost} in {WorstChunkStep ?? "n/a"}");
@@ -63,17 +63,7 @@ namespace IngameScript
                 Echo("");
                 Echo($"Groups: {farmGroups.GroupCount}");
                 Echo($"PlotLCDs: {plotLcds.Count}");
-                // _lastDiscoveryCycle starts at int.MinValue, so subtracting it before
-                // the first discovery pass would overflow and print a nonsense value.
-                int cyclesSinceDiscovery = _lastDiscoveryCycle == int.MinValue
-                    ? RescanIntervalCycles
-                    : CycleNumber - _lastDiscoveryCycle;
-                int cyclesUntilRescan = RescanIntervalCycles - cyclesSinceDiscovery;
-                if (cyclesUntilRescan < 0)
-                {
-                    cyclesUntilRescan = 0;
-                }
-                Echo($"Rescan in: {cyclesUntilRescan}");
+                Echo($"Rescan in: {_cyclesUntilRescan}");
             }
         }
 

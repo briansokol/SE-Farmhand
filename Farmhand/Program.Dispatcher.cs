@@ -15,6 +15,13 @@ namespace IngameScript
             ChunkBoundary
         }
 
+        /// <summary>
+        /// Highest value the cycle tag reaches before wrapping to zero. Nothing compares two
+        /// tags for ordering, only for equality, so wrapping is safe and keeps the tag from
+        /// growing without bound for the life of the session.
+        /// </summary>
+        const int CycleTagWrap = 999999;
+
         /// <summary>Fraction of the per-run instruction allowance a single run may consume.</summary>
         public float BudgetFraction = 0.8f;
 
@@ -112,12 +119,22 @@ namespace IngameScript
         {
             while (true)
             {
-                // CycleNumber gates every cache in the script, so it must advance here at
+                // The cycle tag gates every cache in the script, so it must advance here at
                 // the top of each pass. StepRoot never terminates, which makes the
                 // !MoveNext() branch in RunOneTick purely defensive.
-                CycleNumber++;
+                Block.CycleTag = Block.CycleTag >= CycleTagWrap ? 0 : Block.CycleTag + 1;
                 shiftSprites = !shiftSprites;
-                Block.CurrentCycle = CycleNumber;
+                // The player can lower RescanIntervalCycles at runtime. Clamping first means
+                // a countdown started under a longer interval does not outlive the change,
+                // which is how the old "cycles since last discovery" subtraction behaved.
+                if (_cyclesUntilRescan > RescanIntervalCycles)
+                {
+                    _cyclesUntilRescan = RescanIntervalCycles;
+                }
+                if (_cyclesUntilRescan > 0)
+                {
+                    _cyclesUntilRescan--;
+                }
                 ApplyFrameState();
                 RefreshGroupSnapshot();
                 TicksLastCycle = TicksThisCycle;

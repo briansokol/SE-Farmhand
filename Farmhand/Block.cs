@@ -27,16 +27,19 @@ namespace IngameScript
     internal abstract class Block
     {
         /// <summary>
-        /// The cycle all per-block caches are gated on, published once per cycle by Program.
-        /// Static because Block holds its host as MyGridProgram, and a programmable block
-        /// script has exactly one Program instance.
+        /// Identifies the current cycle for every per-block cache, published once per cycle
+        /// by Program. Static because Block holds its host as MyGridProgram, and a
+        /// programmable block script has exactly one Program instance.
+        ///
+        /// This is a tag, not a count: it wraps, so it is only ever valid to compare two of
+        /// these for equality. Subtracting them or comparing them for ordering is a bug.
         /// </summary>
-        internal static int CurrentCycle;
+        internal static int CycleTag;
 
         protected readonly MyIni _customData = new MyIni();
         protected readonly string _customDataHeader = "Farmhand";
         protected readonly MyGridProgram _program;
-        int _checkedCycle = -1;
+        int _checkedTag = -1;
         string _lastRaw;
 
         // Abstract properties that must be implemented by derived classes
@@ -149,11 +152,11 @@ namespace IngameScript
                 return;
             }
 
-            if (_checkedCycle == CurrentCycle)
+            if (_checkedTag == CycleTag)
             {
                 return;
             }
-            _checkedCycle = CurrentCycle;
+            _checkedTag = CycleTag;
 
             string raw = BlockInstance.CustomData;
             if (raw == _lastRaw)

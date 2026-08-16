@@ -82,7 +82,7 @@ namespace IngameScript
         private readonly IMyLightingComponent _lightingComponent;
         private readonly IMyResourceStorageComponent _storageComponent;
         private FarmPlotDetails _cachedDetails;
-        private int _detailsCycle = -1;
+        private int _detailsTag = -1;
 
         public override IMyTerminalBlock BlockInstance => _farmPlot;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs => null;
@@ -205,12 +205,12 @@ namespace IngameScript
         /// </summary>
         public FarmPlotDetails GetPlotDetails()
         {
-            if (_detailsCycle == Block.CurrentCycle)
+            if (_detailsTag == Block.CycleTag)
             {
                 return _cachedDetails;
             }
 
-            _detailsCycle = Block.CurrentCycle;
+            _detailsTag = Block.CycleTag;
             _cachedDetails = _farmPlotLogic == null
                 ? null
                 : ParsePlotDetails(_farmPlotLogic.GetDetailedInfoWithoutRequiredInput());

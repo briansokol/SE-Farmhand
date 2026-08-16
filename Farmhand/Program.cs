@@ -18,20 +18,19 @@ namespace IngameScript
         readonly string Version = "v2.0.0";
         readonly string PublishedDate = "2026-08-16";
 
-        /// <summary>
-        /// Increments once per completed pipeline cycle. Every per-block cache gates on this
-        /// rather than on tick count, because a cycle can span many ticks on a large farm and
-        /// configuration must stay stable for the whole of it.
-        /// </summary>
-        public int CycleNumber { get; private set; }
-
         /// <summary>Set to force a discovery rescan on the next cycle.</summary>
         public bool RescanRequested { get; set; }
 
         /// <summary>Cycles between periodic discovery rescans.</summary>
         public int RescanIntervalCycles = 30;
 
-        int _lastDiscoveryCycle = int.MinValue;
+        /// <summary>
+        /// Cycles remaining before the next periodic rescan, counted down once per cycle.
+        /// A countdown rather than a "cycles since" subtraction so nothing in the script
+        /// depends on the ordering of two cycle values. Bounded to 0..RescanIntervalCycles.
+        /// Starts at zero so the first cycle discovers.
+        /// </summary>
+        int _cyclesUntilRescan;
 
         // Persistent EntityId to wrapper indexes for the tag-discovered display blocks. These
         // live on Program rather than on FarmGroup because the wrappers are constructed before
@@ -55,17 +54,13 @@ namespace IngameScript
         /// </summary>
         bool IsDiscoveryDue()
         {
-            if (RescanRequested)
-                return true;
-            if (_lastDiscoveryCycle == int.MinValue)
-                return true;
-            return CycleNumber - _lastDiscoveryCycle >= RescanIntervalCycles;
+            return RescanRequested || _cyclesUntilRescan <= 0;
         }
 
         /// <summary>Records that discovery ran this cycle and clears any pending request.</summary>
         void MarkDiscoveryDone()
         {
-            _lastDiscoveryCycle = CycleNumber;
+            _cyclesUntilRescan = RescanIntervalCycles;
             RescanRequested = false;
         }
 
