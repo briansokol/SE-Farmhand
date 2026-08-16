@@ -378,14 +378,15 @@ namespace IngameScript
                 )
             );
         }
-
         /// <summary>
-        /// Gets all registered farm groups
+        /// Returns the live group collection. Callers must not modify the collection while
+        /// enumerating it. Returning the values view avoids a list allocation on every call,
+        /// and BuildStepQueue alone calls this three times per cycle.
         /// </summary>
-        /// <returns>List of all farm groups</returns>
-        public List<FarmGroup> GetAllGroups()
+
+        public IEnumerable<FarmGroup> GetAllGroups()
         {
-            return groups.Values.ToList();
+            return groups.Values;
         }
 
         public int GroupCount => groups.Count;

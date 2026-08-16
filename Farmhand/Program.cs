@@ -273,9 +273,7 @@ namespace IngameScript
             WriteToDiagnosticOutput("", true);
 
             // Print diagnostic info once per cycle
-            farmGroups
-                .GetAllGroups()
-                .ForEach(farmGroup =>
+            foreach (var farmGroup in farmGroups.GetAllGroups())
                 {
                     WriteToDiagnosticOutput($"Group: {farmGroup.GroupName}", true);
                     if (farmGroup.FarmPlots.Count > 0)
@@ -326,7 +324,7 @@ namespace IngameScript
                             $"Broadcast Controllers: {farmGroup.StateManager.RegisteredBroadcastControllerCount}"
                         );
                     }
-                });
+                }
 
             // Print PlotLCD count (independent of groups)
             if (plotLcds.Count > 0)
@@ -340,9 +338,7 @@ namespace IngameScript
         /// </summary>
         void PrintHeaders()
         {
-            farmGroups
-                .GetAllGroups()
-                .ForEach(farmGroup =>
+            foreach (var farmGroup in farmGroups.GetAllGroups())
                 {
                     WriteToMainOutput(
                         farmGroup.GroupName,
@@ -352,7 +348,7 @@ namespace IngameScript
                         runNumber: runNumber
                     );
                     WriteToMainOutput(farmGroup.GroupName, "", "Header", isHeader: true);
-                });
+                }
         }
 
         /// <summary>
