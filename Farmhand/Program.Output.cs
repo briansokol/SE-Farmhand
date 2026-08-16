@@ -12,6 +12,13 @@ namespace IngameScript
 {
     public partial class Program
     {
+        /// <summary>
+        /// Reusable sprite accumulation buffer, keyed by the panel being built. Sprites are
+        /// accumulated across as many ticks as needed, then flushed in a single tick because
+        /// a draw frame cannot be held open across ticks.
+        /// </summary>
+        readonly Dictionary<long, List<MySprite>> _spriteBuffers = new Dictionary<long, List<MySprite>>();
+
         /// <summary>Builds output message lines for every group and writes them to text displays.</summary>
         IEnumerator<YieldReason> StepBuildTextOutput()
         {
@@ -271,13 +278,40 @@ namespace IngameScript
             }
         }
 
-        /// <summary>Placeholder; Task 11 replaces this with chunked sprite accumulation.</summary>
+        /// <summary>
+        /// Accumulates sprites for every graphical panel across as many ticks as needed.
+        /// </summary>
         IEnumerator<YieldReason> StepBuildGraphicalSprites()
         {
-            yield return YieldReason.ChunkBoundary;
+            for (int g = 0; g < _groupSnapshot.Count; g++)
+            {
+                FarmGroup farmGroup = _groupSnapshot[g];
+                for (int i = 0; i < farmGroup.LcdPanels.Count; i++)
+                {
+                    LcdPanel panel = farmGroup.LcdPanels[i];
+                    if (!panel.IsGraphicalMode()) continue;
+
+                    // SetFarmGroup must precede the build; the panel renders from it.
+                    panel.SetFarmGroup(farmGroup);
+
+                    long id = panel.BlockInstance.EntityId;
+                    List<MySprite> buffer;
+                    if (!_spriteBuffers.TryGetValue(id, out buffer))
+                    {
+                        buffer = new List<MySprite>();
+                        _spriteBuffers[id] = buffer;
+                    }
+                    buffer.Clear();
+
+                    panel.BuildSprites(buffer, shiftSprites);
+
+                    yield return YieldReason.ChunkBoundary;
+                    if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+                }
+            }
         }
 
-        /// <summary>Draws graphical displays. Task 11 splits the build and flush phases.</summary>
+        /// <summary>Flushes each accumulated sprite list in a single draw frame per panel.</summary>
         IEnumerator<YieldReason> StepFlushGraphical()
         {
             for (int g = 0; g < _groupSnapshot.Count; g++)
@@ -285,13 +319,15 @@ namespace IngameScript
                 FarmGroup farmGroup = _groupSnapshot[g];
                 for (int i = 0; i < farmGroup.LcdPanels.Count; i++)
                 {
-                    if (farmGroup.LcdPanels[i].IsGraphicalMode())
+                    LcdPanel panel = farmGroup.LcdPanels[i];
+                    if (!panel.IsGraphicalMode()) continue;
+
+                    List<MySprite> buffer;
+                    if (_spriteBuffers.TryGetValue(panel.BlockInstance.EntityId, out buffer))
                     {
-                        // SetFarmGroup must precede the draw, exactly as the original
-                        // RenderGraphicalDisplays did.
-                        farmGroup.LcdPanels[i].SetFarmGroup(farmGroup);
-                        farmGroup.LcdPanels[i].DrawGraphicalUI();
+                        panel.FlushSprites(buffer);
                     }
+
                     yield return YieldReason.ChunkBoundary;
                     if (BudgetExceeded()) yield return YieldReason.BudgetHit;
                 }

@@ -69,6 +69,9 @@ namespace IngameScript
         private List<LayoutRow> _cachedLayoutRows;
         private int _cachedPlotCount = -1;
 
+        // Reusable sprite buffer for DrawGraphicalUI, so that path allocates nothing per render
+        private readonly List<MySprite> _spriteBuffer = new List<MySprite>();
+
         /// <summary>
         /// Initializes a new SpriteRenderer for the specified surface and farm group
         /// </summary>
@@ -227,16 +230,41 @@ namespace IngameScript
         /// </summary>
         public void DrawGraphicalUI()
         {
+            PrepareSurface();
+            _spriteBuffer.Clear();
+            BuildSprites(_spriteBuffer);
+            if (_spriteBuffer.Count == 0) return;
+
+            using (var frame = _surface.DrawFrame())
+            {
+                for (int i = 0; i < _spriteBuffer.Count; i++)
+                {
+                    frame.Add(_spriteBuffer[i]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Prepares the surface for script rendering. Must run even for unsupported screens,
+        /// matching the original DrawGraphicalUI which set these before its unsupported check.
+        /// </summary>
+        public void PrepareSurface()
+        {
             _surface.ContentType = ContentType.SCRIPT;
             _surface.Script = string.Empty;
+        }
 
-            // Check if screen size is unsupported
+        /// <summary>
+        /// Accumulates this panel's sprites into a buffer without touching the surface, so the
+        /// expensive layout work can be spread across ticks. The parameter is named frame
+        /// because the helpers it delegates to were written against a draw frame; it is an
+        /// ordinary list here.
+        /// </summary>
+        public void BuildSprites(List<MySprite> frame)
+        {
             if (!_isScreenSizeSupported)
             {
-                using (var frame = _surface.DrawFrame())
-                {
-                    DrawUnsupportedScreenMessage(frame);
-                }
+                DrawUnsupportedScreenMessage(frame);
                 return;
             }
 
@@ -245,59 +273,56 @@ namespace IngameScript
                 return;
             }
 
-            using (var frame = _surface.DrawFrame())
+            // Shift sprite array every other render to force redraw on server clients
+            if (_shiftSprites)
             {
-                // Shift sprite array every other render to force redraw on server clients
-                if (_shiftSprites)
+                frame.Add(new MySprite());
+            }
+
+            // Draw header and footer
+            DrawHeader(frame);
+
+            // Get or compute layout rows (cached when plot count hasn't changed)
+            var layoutRows = GetOrComputeLayoutRows();
+
+            // Start just below the header (with double spacing)
+            float currentY = RectHeight / 2 + _headerFontHeight + _spacing * 4;
+
+            // Draw each layout row
+            foreach (var layoutRow in layoutRows)
+            {
+                int maxRowsInThisLayoutRow = 0;
+
+                // Process left column (always present)
+                if (layoutRow.LeftGroup != null)
                 {
-                    frame.Add(new MySprite());
+                    int rowsInLeftGroup = DrawColumn(
+                        frame,
+                        layoutRow.LeftGroup,
+                        _leftMargin,
+                        currentY
+                    );
+                    maxRowsInThisLayoutRow = rowsInLeftGroup;
                 }
 
-                // Draw header and footer
-                DrawHeader(frame);
-
-                // Get or compute layout rows (cached when plot count hasn't changed)
-                var layoutRows = GetOrComputeLayoutRows();
-
-                // Start just below the header (with double spacing)
-                float currentY = RectHeight / 2 + _headerFontHeight + _spacing * 4;
-
-                // Draw each layout row
-                foreach (var layoutRow in layoutRows)
+                // Process right column (if present)
+                if (layoutRow.RightGroup != null)
                 {
-                    int maxRowsInThisLayoutRow = 0;
-
-                    // Process left column (always present)
-                    if (layoutRow.LeftGroup != null)
+                    int rowsInRightGroup = DrawColumn(
+                        frame,
+                        layoutRow.RightGroup,
+                        _viewport.Width / 2f + _leftMargin,
+                        currentY
+                    );
+                    if (rowsInRightGroup > maxRowsInThisLayoutRow)
                     {
-                        int rowsInLeftGroup = DrawColumn(
-                            frame,
-                            layoutRow.LeftGroup,
-                            _leftMargin,
-                            currentY
-                        );
-                        maxRowsInThisLayoutRow = rowsInLeftGroup;
+                        maxRowsInThisLayoutRow = rowsInRightGroup;
                     }
-
-                    // Process right column (if present)
-                    if (layoutRow.RightGroup != null)
-                    {
-                        int rowsInRightGroup = DrawColumn(
-                            frame,
-                            layoutRow.RightGroup,
-                            _viewport.Width / 2f + _leftMargin,
-                            currentY
-                        );
-                        if (rowsInRightGroup > maxRowsInThisLayoutRow)
-                        {
-                            maxRowsInThisLayoutRow = rowsInRightGroup;
-                        }
-                    }
-
-                    // Move to next layout row (based on tallest group in this row, with double spacing)
-                    currentY +=
-                        maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing * 2;
                 }
+
+                // Move to next layout row (based on tallest group in this row, with double spacing)
+                currentY +=
+                    maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing * 2;
             }
         }
 
@@ -410,7 +435,7 @@ namespace IngameScript
         /// <param name="currentY">Y position where the column starts</param>
         /// <returns>Number of rows used by this column</returns>
         private int DrawColumn(
-            MySpriteDrawFrame frame,
+            List<MySprite> frame,
             IGrouping<string, FarmPlot> group,
             float columnStartX,
             float currentY
@@ -454,7 +479,7 @@ namespace IngameScript
         /// Draws the header sprite at the top of the screen
         /// </summary>
         /// <param name="frame">The sprite frame to add the header to</param>
-        private void DrawHeader(MySpriteDrawFrame frame)
+        private void DrawHeader(List<MySprite> frame)
         {
             var headerTitle = string.IsNullOrEmpty(_customTitle) ? "Farmhand" : _customTitle;
             string headerText = RenderHelpers.GetHeaderAnimation(
@@ -484,7 +509,7 @@ namespace IngameScript
         /// <param name="currentY">Y position for the icon</param>
         /// <param name="plots">List of plots in the group</param>
         private void DrawGroupIcon(
-            MySpriteDrawFrame frame,
+            List<MySprite> frame,
             float columnStartX,
             float currentY,
             List<FarmPlot> plots
@@ -537,7 +562,7 @@ namespace IngameScript
         /// <param name="plot">The farm plot to draw</param>
         /// <param name="renderState">Pre-calculated rendering state with colors and growth progress</param>
         private void DrawFarmPlot(
-            MySpriteDrawFrame frame,
+            List<MySprite> frame,
             float x,
             float y,
             FarmPlot plot,
@@ -647,7 +672,7 @@ namespace IngameScript
         /// Draws the footer sprite with dimensions at the bottom of the screen
         /// </summary>
         /// <param name="frame">The sprite frame to add the footer to</param>
-        private void DrawFooter(MySpriteDrawFrame frame)
+        private void DrawFooter(List<MySprite> frame)
         {
             string dimensionsText = $"{(int)_viewport.Width} x {(int)_viewport.Height}";
             frame.Add(
@@ -671,7 +696,7 @@ namespace IngameScript
         /// Draws an unsupported screen size message in the center of the screen
         /// </summary>
         /// <param name="frame">The sprite frame to add the message to</param>
-        private void DrawUnsupportedScreenMessage(MySpriteDrawFrame frame)
+        private void DrawUnsupportedScreenMessage(List<MySprite> frame)
         {
             frame.Add(
                 new MySprite()

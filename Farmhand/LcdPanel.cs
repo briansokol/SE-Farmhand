@@ -265,6 +265,39 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Appends this panel's sprites to the supplied buffer without opening a draw frame,
+        /// so the expensive layout work can be spread across ticks.
+        /// </summary>
+        public void BuildSprites(List<MySprite> target, bool shiftSprites)
+        {
+            if (!IsFunctional() || _lcdPanel == null || !IsGraphicalMode()) return;
+
+            var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle(), shiftSprites);
+            renderer.PrepareSurface();
+            renderer.BuildSprites(target);
+        }
+
+        /// <summary>
+        /// Draws a pre-built sprite list in a single frame. Building happens across earlier
+        /// ticks; only this cheap flush needs to happen inside the frame's lifetime.
+        /// An empty buffer means the renderer chose not to draw, so leave the surface alone
+        /// rather than opening a frame that would blank it.
+        /// </summary>
+        public void FlushSprites(List<MySprite> sprites)
+        {
+            if (!IsFunctional() || _lcdPanel == null || !IsGraphicalMode()) return;
+            if (sprites.Count == 0) return;
+
+            using (var frame = _lcdPanel.DrawFrame())
+            {
+                for (int i = 0; i < sprites.Count; i++)
+                {
+                    frame.Add(sprites[i]);
+                }
+            }
+        }
+
+        /// <summary>
         /// Checks if a specific category is set to be visible on the LCD panel
         /// </summary>
         /// <param name="category">The category to check</param>
