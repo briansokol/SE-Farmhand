@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using FluentAssertions;
 using IngameScript;
 using Xunit;
@@ -62,12 +63,30 @@ namespace Farmhand.Tests
         }
 
         [Fact]
-        public void Parse_NonEnglishNumberFormatting_UsesInvariantCulture()
+        public void Parse_UnderNonInvariantCulture_StillReadsDotDecimalSeparator()
         {
-            // Values arrive with '.' as the decimal separator regardless of client locale.
-            var details = FarmPlot.ParsePlotDetails("Progress: 7.5 %\n");
+            // de-DE uses ',' as its decimal separator. NumberStyles.Float does not
+            // include AllowThousands, so a CurrentCulture parse of "7.5" under de-DE
+            // fails outright and the value would silently stay 0. This test therefore
+            // fails if ParsePlotDetails is ever switched to CurrentCulture.
+            var original = CultureInfo.CurrentCulture;
+            try
+            {
+                CultureInfo.CurrentCulture = new CultureInfo("de-DE");
 
-            details.GrowthProgress.Should().BeApproximately(0.075f, 0.0001f);
+                var details = FarmPlot.ParsePlotDetails(
+                    "Growth Progress: 7.5 %\n" +
+                    "Crop Health: 42.5 %\n" +
+                    "Current Water Usage: 1.6 L/min\n");
+
+                details.GrowthProgress.Should().BeApproximately(0.075f, 0.0001f);
+                details.CropHealth.Should().BeApproximately(0.425f, 0.0001f);
+                details.WaterUsage.Should().BeApproximately(1.6f, 0.0001f);
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = original;
+            }
         }
 
         [Fact]
