@@ -90,6 +90,7 @@ namespace IngameScript
                 shiftSprites = !shiftSprites;
                 Block.CurrentCycle = CycleNumber;
                 ApplyFrameState();
+                RefreshGroupSnapshot();
                 TicksLastCycle = TicksThisCycle;
                 TicksThisCycle = 0;
                 InstructionHighWater = 0;

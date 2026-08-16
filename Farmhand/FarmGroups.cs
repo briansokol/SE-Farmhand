@@ -22,6 +22,12 @@ namespace IngameScript
         public List<BroadcastController> BroadcastControllers { get; }
         public StateManager StateManager { get; }
         public FarmStats Stats { get; set; }
+
+        /// <summary>
+        /// Buffer the chunked scan steps accumulate into. Displays read Stats, so a scan
+        /// spread over several ticks never exposes a half-built snapshot.
+        /// </summary>
+        public FarmStats ScratchStats { get; set; }
         public ProgrammableBlock ProgrammableBlock { get; set; }
         public int RunNumber { get; set; }
 
@@ -53,6 +59,7 @@ namespace IngameScript
             BroadcastControllers = new List<BroadcastController>();
             StateManager = new StateManager();
             Stats = new FarmStats();
+            ScratchStats = new FarmStats();
         }
     }
 
@@ -380,8 +387,9 @@ namespace IngameScript
         }
         /// <summary>
         /// Returns the live group collection. Callers must not modify the collection while
-        /// enumerating it. Returning the values view avoids a list allocation on every call,
-        /// and BuildStepQueue alone calls this three times per cycle.
+        /// enumerating it, and must not suspend mid-enumeration: pipeline steps that yield
+        /// walk Program's per-cycle group snapshot instead, refreshed in StepRoot(). Returning
+        /// the values view avoids a list allocation on every call.
         /// </summary>
 
         public IEnumerable<FarmGroup> GetAllGroups()

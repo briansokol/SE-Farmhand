@@ -1,0 +1,159 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Sandbox.ModAPI.Ingame;
+using SpaceEngineers.Game.ModAPI.Ingame;
+using VRage.Game.GUI.TextPanel;
+using VRage.Game.ModAPI.Ingame;
+using VRage.Game.ModAPI.Ingame.Utilities;
+using VRageMath;
+
+namespace IngameScript
+{
+    public partial class Program
+    {
+        /// <summary>
+        /// Rediscovers tagged displays and group members when discovery is due.
+        /// Exits immediately on cycles where nothing needs rescanning.
+        /// </summary>
+        IEnumerator<YieldReason> StepDiscoveryIfDue()
+        {
+            if (!IsDiscoveryDue())
+            {
+                yield return YieldReason.ChunkBoundary;
+                yield break;
+            }
+
+            FindFarmLCDBlocks();
+            yield return YieldReason.ChunkBoundary;
+            if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+
+            FindPlotLCDBlocks();
+            MarkDiscoveryDone();
+            yield return YieldReason.ChunkBoundary;
+        }
+
+        /// <summary>
+        /// Discovers and categorizes blocks with [FarmLCD] tags for farm management
+        /// </summary>
+        void FindFarmLCDBlocks()
+        {
+            var lcdPanels = new List<LcdPanel>();
+            var surfaceProviders = new List<TextSurfaceProvider>();
+
+            // Find the blocks with [FarmLCD] in their custom name
+            List<IMyTerminalBlock> lcdTaggedBlocks = new List<IMyTerminalBlock>();
+            GridTerminalSystem.SearchBlocksOfName($"[{lcdTag}]", lcdTaggedBlocks);
+
+            lcdTaggedBlocks.ForEach(block =>
+            {
+                if (TextSurfaceProvider.BlockIsValid(block))
+                {
+                    TextSurfaceProvider provider;
+                    if (!_textSurfaceProvidersById.TryGetValue(block.EntityId, out provider))
+                    {
+                        provider = new TextSurfaceProvider(block, this, shiftSprites);
+                        _textSurfaceProvidersById[block.EntityId] = provider;
+                    }
+                    else
+                    {
+                        // Reused wrapper: the constructor's UpdateCustomData no longer runs
+                        // every cycle, so restore a config key the player deleted here.
+                        provider.UpdateCustomData();
+                    }
+                    surfaceProviders.Add(provider);
+                }
+                else if (LcdPanel.BlockIsValid(block as IMyFunctionalBlock))
+                {
+                    LcdPanel lcdPanel;
+                    if (!_lcdPanelsById.TryGetValue(block.EntityId, out lcdPanel))
+                    {
+                        lcdPanel = new LcdPanel(block as IMyTextPanel, this, shiftSprites);
+                        _lcdPanelsById[block.EntityId] = lcdPanel;
+                    }
+                    else
+                    {
+                        lcdPanel.UpdateCustomData();
+                    }
+                    lcdPanels.Add(lcdPanel);
+                }
+            });
+
+            var groupNames = lcdPanels
+                .ConvertAll(panel => panel.GroupName())
+                .FindAll(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct()
+                .ToList();
+
+            var surfaceProviderGroupNames = surfaceProviders
+                .ConvertAll(provider => provider.GroupName())
+                .FindAll(name => !string.IsNullOrWhiteSpace(name));
+
+            groupNames.AddRange(surfaceProviderGroupNames);
+            groupNames = groupNames.Distinct().ToList();
+
+            // Get group name from this programmable block if set
+            var pbGroupName = thisPb.GroupName();
+            if (!string.IsNullOrWhiteSpace(pbGroupName) && !groupNames.Contains(pbGroupName))
+            {
+                groupNames.Add(pbGroupName);
+            }
+
+            // Remove those farm groups that are no longer referenced by any LCD panel or this programmable block
+            farmGroups.RemoveGroupsNotInList(groupNames);
+
+            // For each group name, find and register the blocks
+            foreach (var groupName in groupNames)
+            {
+                var lcdPanelsInGroup = lcdPanels.FindAll(panel => panel.GroupName() == groupName);
+                var surfaceProvidersInGroup = surfaceProviders.FindAll(provider =>
+                    provider.GroupName() == groupName
+                );
+                farmGroups.ResetBlocks(groupName, lcdPanelsInGroup, surfaceProvidersInGroup);
+
+                var group = farmGroups.GetGroup(groupName);
+                group.ProgrammableBlock = thisPb;
+
+                farmGroups.FindFarmPlots(groupName);
+                farmGroups.FindIrrigationSystems(groupName);
+                farmGroups.FindWaterTanks(groupName);
+                farmGroups.FindAirVents(groupName);
+                farmGroups.FindSolarFoodGenerators(groupName);
+                farmGroups.FindTimers(groupName);
+                farmGroups.FindActionRelays(groupName);
+                farmGroups.FindBroadcastControllers(groupName);
+            }
+        }
+
+        /// <summary>
+        /// Discovers and categorizes blocks with [PlotLCD] tags
+        /// </summary>
+        void FindPlotLCDBlocks()
+        {
+            // Find blocks with [PlotLCD] in their custom name
+            plotLcds.Clear();
+            List<IMyTerminalBlock> plotLcdTaggedBlocks = new List<IMyTerminalBlock>();
+            GridTerminalSystem.SearchBlocksOfName($"[{plotLcdTag}]", plotLcdTaggedBlocks);
+
+            plotLcdTaggedBlocks.ForEach(block =>
+            {
+                if (PlotLCD.BlockIsValid(block))
+                {
+                    PlotLCD plotLcd;
+                    if (!_plotLcdsById.TryGetValue(block.EntityId, out plotLcd))
+                    {
+                        plotLcd = new PlotLCD(block as IMyTextPanel, this, shiftSprites);
+                        _plotLcdsById[block.EntityId] = plotLcd;
+                    }
+                    plotLcds.Add(plotLcd);
+
+                    // Find nearby farm plot (only if resolution is correct)
+                    if (plotLcd.IsCorrectResolution)
+                    {
+                        plotLcd.FindNearbyFarmPlot();
+                    }
+                }
+            });
+        }
+    }
+}

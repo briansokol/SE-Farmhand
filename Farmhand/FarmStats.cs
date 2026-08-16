@@ -133,6 +133,21 @@ namespace IngameScript
             GrowthSummary = new Dictionary<string, float>();
             AlertMessages = new List<string>();
 
+            Clear();
+        }
+
+        /// <summary>
+        /// Resets every accumulated value so the instance can be reused as a per-cycle
+        /// scratch buffer instead of allocating a replacement each cycle.
+        /// </summary>
+        public void Clear()
+        {
+            CausesOfDeath.Clear();
+            PlotSummary.Clear();
+            YieldSummary.Clear();
+            GrowthSummary.Clear();
+            AlertMessages.Clear();
+
             SeedsNeeded = 0;
             DeadPlants = 0;
             DyingPlants = 0;
