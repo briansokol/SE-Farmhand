@@ -39,16 +39,28 @@ namespace IngameScript
             }
         }
 
-        /// <summary>Writes the per-tick dispatcher status to the programmable block's Echo output.</summary>
+        /// <summary>
+        /// Renders pipeline status to the programmable block screen. The instruction high
+        /// water mark specifically exists so a future report of a size-related failure can be
+        /// diagnosed without profiling from scratch.
+        /// </summary>
         void RenderEchoStatus()
         {
             Echo("Farmhand");
             Echo($"{Version} | {PublishedDate}");
-            Echo("");
-            Echo($"Step: {_stepIndex} {_stepLabel}");
-            Echo($"Cycle: {CycleNumber} ({TicksLastCycle} ticks)");
-            Echo($"Instructions: {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
-            Echo($"High water: {InstructionHighWater}");
+            Echo(_paused ? "[PAUSED]" : "");
+            Echo($"Step {_stepIndex}/{StepLabels.Length}: {_stepLabel}");
+            Echo($"Cycle {CycleNumber} | {TicksLastCycle} ticks");
+            Echo($"Instr {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
+            Echo($"Peak {InstructionHighWater} (limit {(int)(Runtime.MaxInstructionCount * BudgetFraction)})");
+
+            if (DebugLogging)
+            {
+                Echo("");
+                Echo($"Groups: {farmGroups.GroupCount}");
+                Echo($"PlotLCDs: {plotLcds.Count}");
+                Echo($"Rescan in: {RescanIntervalCycles - (CycleNumber - _lastDiscoveryCycle)}");
+            }
         }
 
         /// <summary>

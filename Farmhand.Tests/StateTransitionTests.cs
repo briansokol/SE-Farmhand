@@ -2,13 +2,6 @@ using FluentAssertions;
 using IngameScript;
 using Xunit;
 
-// StateManager holds List<Timer>, so constructing one forces the runtime to lay out
-// IngameScript.Block and resolve its MyIni field from VRage.Game. When that happens on
-// one thread while another test collection is resolving the same types through FarmPlot,
-// the Mono type loader used by the net48 test host on Linux aborts the process. The suite
-// runs in well under a second, so serialising the collections costs nothing.
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
-
 namespace Farmhand.Tests
 {
     /// <summary>

@@ -15,8 +15,8 @@ namespace IngameScript
         readonly string plotLcdTag = "PlotLCD";
         readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
-        readonly string Version = "v1.3.0";
-        readonly string PublishedDate = "2026-03-22";
+        readonly string Version = "v2.0.0";
+        readonly string PublishedDate = "2026-08-16";
 
         /// <summary>
         /// Increments once per completed pipeline cycle. Every per-block cache gates on this

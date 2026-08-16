@@ -124,9 +124,13 @@ namespace IngameScript
         /// <returns>True if the state has changed</returns>
         public bool HasStateChanged(string stateName, bool currentValue)
         {
-            bool previousValue = _previousStates.ContainsKey(stateName)
-                ? _previousStates[stateName]
-                : currentValue;
+            bool previousValue;
+            if (!_previousStates.TryGetValue(stateName, out previousValue))
+            {
+                // A state seen for the first time is not a transition. This is what prevents
+                // every timer, relay and broadcast controller firing on script recompile.
+                return false;
+            }
             return previousValue != currentValue;
         }
 
