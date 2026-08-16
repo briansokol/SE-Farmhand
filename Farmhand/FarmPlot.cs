@@ -81,6 +81,8 @@ namespace IngameScript
         private readonly IMyFarmPlotLogic _farmPlotLogic;
         private readonly IMyLightingComponent _lightingComponent;
         private readonly IMyResourceStorageComponent _storageComponent;
+        private FarmPlotDetails _cachedDetails;
+        private int _detailsCycle = -1;
 
         public override IMyTerminalBlock BlockInstance => _farmPlot;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs => null;
@@ -197,17 +199,23 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Parses the detailed info string from the farm plot into structured data
+        /// Returns this plot's parsed detail values, computing them at most once per cycle.
+        /// The underlying engine call plus string parse is expensive and several renderers
+        /// request the same plot's details within a single cycle.
         /// </summary>
-        /// <returns>Parsed farm plot details, or null if parsing fails</returns>
         public FarmPlotDetails GetPlotDetails()
         {
-            if (_farmPlotLogic == null)
+            if (_detailsCycle == Block.CurrentCycle)
             {
-                return null;
+                return _cachedDetails;
             }
 
-            return ParsePlotDetails(_farmPlotLogic.GetDetailedInfoWithoutRequiredInput());
+            _detailsCycle = Block.CurrentCycle;
+            _cachedDetails = _farmPlotLogic == null
+                ? null
+                : ParsePlotDetails(_farmPlotLogic.GetDetailedInfoWithoutRequiredInput());
+
+            return _cachedDetails;
         }
 
         /// <summary>
