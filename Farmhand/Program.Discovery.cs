@@ -24,7 +24,11 @@ namespace IngameScript
                 yield break;
             }
 
-            FindFarmLCDBlocks();
+            IEnumerator<YieldReason> farmLcds = FindFarmLCDBlocks();
+            while (farmLcds.MoveNext())
+            {
+                yield return farmLcds.Current;
+            }
             yield return YieldReason.ChunkBoundary;
             if (BudgetExceeded()) yield return YieldReason.BudgetHit;
 
@@ -42,9 +46,13 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Discovers and categorizes blocks with [FarmLCD] tags for farm management
+        /// Discovers and categorizes blocks with [FarmLCD] tags for farm management.
+        /// Yields between each per-group block search: run as one unit this measured 7,300
+        /// instructions, matching BuildText as the script's worst-case chunk. Nothing else
+        /// runs while discovery is in progress, so the group set being half rebuilt across
+        /// a tick boundary is never observed by another step.
         /// </summary>
-        void FindFarmLCDBlocks()
+        IEnumerator<YieldReason> FindFarmLCDBlocks()
         {
             var lcdPanels = new List<LcdPanel>();
             var surfaceProviders = new List<TextSurfaceProvider>();
@@ -109,8 +117,10 @@ namespace IngameScript
 
             // Remove those farm groups that are no longer referenced by any LCD panel or this programmable block
             farmGroups.RemoveGroupsNotInList(groupNames);
+            yield return YieldReason.ChunkBoundary;
 
-            // For each group name, find and register the blocks
+            // For each group name, find and register the blocks. Each Find call below walks
+            // the grid, so they are separated by chunk boundaries rather than run as a batch.
             foreach (var groupName in groupNames)
             {
                 var lcdPanelsInGroup = lcdPanels.FindAll(panel => panel.GroupName() == groupName);
@@ -121,15 +131,24 @@ namespace IngameScript
 
                 var group = farmGroups.GetGroup(groupName);
                 group.ProgrammableBlock = thisPb;
+                yield return YieldReason.ChunkBoundary;
 
                 farmGroups.FindFarmPlots(groupName);
+                yield return YieldReason.ChunkBoundary;
                 farmGroups.FindIrrigationSystems(groupName);
+                yield return YieldReason.ChunkBoundary;
                 farmGroups.FindWaterTanks(groupName);
+                yield return YieldReason.ChunkBoundary;
                 farmGroups.FindAirVents(groupName);
+                yield return YieldReason.ChunkBoundary;
                 farmGroups.FindSolarFoodGenerators(groupName);
+                yield return YieldReason.ChunkBoundary;
                 farmGroups.FindTimers(groupName);
+                yield return YieldReason.ChunkBoundary;
                 farmGroups.FindActionRelays(groupName);
+                yield return YieldReason.ChunkBoundary;
                 farmGroups.FindBroadcastControllers(groupName);
+                yield return YieldReason.ChunkBoundary;
             }
         }
 

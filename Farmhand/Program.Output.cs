@@ -32,7 +32,16 @@ namespace IngameScript
             {
                 FarmGroup farmGroup = _groupSnapshot[g];
                 PrintHeadersForGroup(farmGroup);
-                BuildMessagesForGroup(farmGroup);
+                yield return YieldReason.ChunkBoundary;
+
+                // Relay the inner iterator's chunks rather than draining it here, so a group
+                // whose message set is large stays interruptible line by line.
+                IEnumerator<YieldReason> messages = BuildMessagesForGroup(farmGroup);
+                while (messages.MoveNext())
+                {
+                    yield return messages.Current;
+                }
+
                 yield return YieldReason.ChunkBoundary;
                 if (BudgetExceeded()) yield return YieldReason.BudgetHit;
             }
@@ -56,8 +65,12 @@ namespace IngameScript
         /// <summary>
         /// Builds the categorised text message lines for a single farm group from its
         /// published statistics and appends them to the group's text displays.
+        /// Every emitted line fans out across every display in the group, so emission yields
+        /// per line rather than per category: at 22 displays the whole method measured as a
+        /// single 7,400 instruction chunk, which set the worst-case peak for the script.
+        /// The message lists themselves are cheap to compute and stay in one chunk.
         /// </summary>
-        void BuildMessagesForGroup(FarmGroup farmGroup)
+        IEnumerator<YieldReason> BuildMessagesForGroup(FarmGroup farmGroup)
         {
             var groupName = farmGroup.GroupName;
             var stats = farmGroup.Stats;
@@ -174,48 +187,60 @@ namespace IngameScript
                 }
             }
 
+            // A lambda cannot yield, so each ForEach becomes a loop. Order and content of the
+            // emitted lines are unchanged.
             if (stats.AlertMessages.Count > 0)
             {
                 WriteToMainOutput(groupName, "Alerts", "ShowAlerts", isHeader: true);
-                stats.AlertMessages.ForEach(message =>
-                    WriteToMainOutput(groupName, message, "ShowAlerts")
-                );
+                for (int i = 0; i < stats.AlertMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, stats.AlertMessages[i], "ShowAlerts");
+                    yield return YieldReason.ChunkBoundary;
+                }
                 WriteToMainOutput(groupName, "", "ShowAlerts");
             }
 
             if (farmPlotMessages.Count > 0)
             {
                 WriteToMainOutput(groupName, "Farm Plots", "ShowFarmPlots", isHeader: true);
-                farmPlotMessages.ForEach(message =>
-                    WriteToMainOutput(groupName, message, "ShowFarmPlots")
-                );
+                for (int i = 0; i < farmPlotMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, farmPlotMessages[i], "ShowFarmPlots");
+                    yield return YieldReason.ChunkBoundary;
+                }
                 WriteToMainOutput(groupName, "", "ShowFarmPlots");
             }
 
             if (atmosphereMessages.Count > 0)
             {
                 WriteToMainOutput(groupName, "Atmosphere", "ShowAtmosphere", isHeader: true);
-                atmosphereMessages.ForEach(message =>
-                    WriteToMainOutput(groupName, message, "ShowAtmosphere")
-                );
+                for (int i = 0; i < atmosphereMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, atmosphereMessages[i], "ShowAtmosphere");
+                    yield return YieldReason.ChunkBoundary;
+                }
                 WriteToMainOutput(groupName, "", "ShowAtmosphere");
             }
 
             if (irrigationMessages.Count > 0)
             {
                 WriteToMainOutput(groupName, "Irrigation", "ShowIrrigation", isHeader: true);
-                irrigationMessages.ForEach(message =>
-                    WriteToMainOutput(groupName, message, "ShowIrrigation")
-                );
+                for (int i = 0; i < irrigationMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, irrigationMessages[i], "ShowIrrigation");
+                    yield return YieldReason.ChunkBoundary;
+                }
                 WriteToMainOutput(groupName, "", "ShowIrrigation");
             }
 
             if (waterTankMessages.Count > 0)
             {
                 WriteToMainOutput(groupName, "Water Tanks", "ShowWaterTanks", isHeader: true);
-                waterTankMessages.ForEach(message =>
-                    WriteToMainOutput(groupName, message, "ShowWaterTanks")
-                );
+                for (int i = 0; i < waterTankMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, waterTankMessages[i], "ShowWaterTanks");
+                    yield return YieldReason.ChunkBoundary;
+                }
                 WriteToMainOutput(groupName, "", "ShowWaterTanks");
             }
 
@@ -227,18 +252,26 @@ namespace IngameScript
                     "ShowSolarFoodGenerators",
                     isHeader: true
                 );
-                solarFoodGeneratorMessages.ForEach(message =>
-                    WriteToMainOutput(groupName, message, "ShowSolarFoodGenerators")
-                );
+                for (int i = 0; i < solarFoodGeneratorMessages.Count; i++)
+                {
+                    WriteToMainOutput(
+                        groupName,
+                        solarFoodGeneratorMessages[i],
+                        "ShowSolarFoodGenerators"
+                    );
+                    yield return YieldReason.ChunkBoundary;
+                }
                 WriteToMainOutput(groupName, "", "ShowSolarFoodGenerators");
             }
 
             if (yieldMessages.Count > 0)
             {
                 WriteToMainOutput(groupName, "Current Yield", "ShowYield", isHeader: true);
-                yieldMessages.ForEach(message =>
-                    WriteToMainOutput(groupName, message, "ShowYield")
-                );
+                for (int i = 0; i < yieldMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, yieldMessages[i], "ShowYield");
+                    yield return YieldReason.ChunkBoundary;
+                }
                 WriteToMainOutput(groupName, "", "ShowYield");
             }
         }
