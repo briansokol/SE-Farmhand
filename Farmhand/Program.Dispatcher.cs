@@ -18,6 +18,12 @@ namespace IngameScript
         /// <summary>Fraction of the per-run instruction allowance a single run may consume.</summary>
         public float BudgetFraction = 0.8f;
 
+        /// <summary>Whether to show verbose pipeline detail on the programmable block screen.</summary>
+        public bool DebugLogging;
+
+        /// <summary>True while the pipeline is paused via the "pause" command.</summary>
+        bool _paused;
+
         /// <summary>Index of the currently executing step.</summary>
         int _stepIndex;
 

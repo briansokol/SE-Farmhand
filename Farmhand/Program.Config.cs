@@ -35,6 +35,12 @@ namespace IngameScript
 
             _lastSeenCustomData = Me.CustomData;
             thisPb.ParseCustomData();
+
+            // The accessors clamp; this step only publishes the values onto Program.
+            BudgetFraction = thisPb.BudgetFraction;
+            RescanIntervalCycles = thisPb.RescanIntervalCycles;
+            DebugLogging = thisPb.DebugLogging;
+
             _configDirty = false;
 
             yield return YieldReason.ChunkBoundary;

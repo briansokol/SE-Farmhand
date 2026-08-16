@@ -90,7 +90,10 @@ namespace IngameScript
                 DispatchCommand(argument.Trim());
             }
 
-            RunOneTick();
+            if (!_paused)
+            {
+                RunOneTick();
+            }
             RenderEchoStatus();
         }
 

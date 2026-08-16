@@ -12,12 +12,30 @@ namespace IngameScript
 {
     public partial class Program
     {
-        /// <summary>Routes a terminal argument to the matching maintenance command.</summary>
+        /// <summary>Routes a terminal argument to its handler.</summary>
         void DispatchCommand(string argument)
         {
-            if (argument.ToLower() == "cleanup")
+            switch (argument.ToLower())
             {
-                CleanupAllCustomData();
+                case "cleanup":
+                    CleanupAllCustomData();
+                    break;
+                case "rescan":
+                    RescanRequested = true;
+                    _configDirty = true;
+                    break;
+                case "pause":
+                    _paused = true;
+                    break;
+                case "resume":
+                    _paused = false;
+                    break;
+                case "debug on":
+                    DebugLogging = true;
+                    break;
+                case "debug off":
+                    DebugLogging = false;
+                    break;
             }
         }
 
