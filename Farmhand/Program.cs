@@ -65,20 +65,13 @@ namespace IngameScript
             RescanRequested = false;
         }
 
-        // Step-based state machine management
-        delegate void Step();
-        readonly List<Step> stepQueue = new List<Step>();
-        int currentStepIndex = 0;
-        double currentCycleTime = 0;
-        double lastCycleTime = 0;
-
         bool shiftSprites = false;
 
         public Program()
         {
             thisPb = new ProgrammableBlock(Me, this);
             farmGroups = new FarmGroups(GridTerminalSystem, this);
-            Runtime.UpdateFrequency = UpdateFrequency.Update10;
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
 
         /// <summary>
@@ -86,83 +79,34 @@ namespace IngameScript
         /// </summary>
         public void Save() { }
 
-        /// <summary>
-        /// Main execution loop called every 10 ticks by Space Engineers
-        /// </summary>
         public void Main(string argument)
         {
-            // Handle cleanup command
-            if (!string.IsNullOrWhiteSpace(argument) && argument.Trim().ToLower() == "cleanup")
+            if (!string.IsNullOrWhiteSpace(argument))
+            {
+                DispatchCommand(argument.Trim());
+            }
+
+            RunOneTick();
+            RenderEchoStatus();
+        }
+
+        void DispatchCommand(string argument)
+        {
+            if (argument.ToLower() == "cleanup")
             {
                 CleanupAllCustomData();
-                return;
             }
+        }
 
-            // Build step queue when starting a new cycle
-            if (currentStepIndex >= stepQueue.Count)
-            {
-                RestartCycle();
-            }
-
-            // Execute current step
-            ExecuteCurrentStep();
-
-            // Accumulate cycle time
-            currentCycleTime += Runtime.TimeSinceLastRun.TotalMilliseconds;
-
+        void RenderEchoStatus()
+        {
             Echo("Farmhand");
             Echo($"{Version} | {PublishedDate}");
             Echo("");
+            Echo($"Step: {_stepIndex} {_stepLabel}");
+            Echo($"Cycle: {CycleNumber} ({TicksLastCycle} ticks)");
             Echo($"Instructions: {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
-            Echo(
-                $"Quota: {(float)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount:P2}"
-            );
-            Echo($"Current Step: {currentStepIndex}/{stepQueue.Count}");
-            Echo($"Last Cycle Time: {lastCycleTime / 1000:F2}s");
-        }
-
-        /// <summary>
-        /// Executes the current step in the step queue and advances to the next step
-        /// </summary>
-        void ExecuteCurrentStep()
-        {
-            if (currentStepIndex >= stepQueue.Count)
-                return;
-
-            try
-            {
-                // Execute the current step
-                stepQueue[currentStepIndex]();
-
-                // Advance to next step
-                currentStepIndex++;
-            }
-            catch
-            {
-                // Error in step, skip to next
-                currentStepIndex++;
-            }
-        }
-
-        /// <summary>
-        /// Restarts the cycle by building a new step queue and printing diagnostic information
-        /// </summary>
-        void RestartCycle()
-        {
-            CycleNumber++;
-            Block.CurrentCycle = CycleNumber;
-            ApplyFrameState();
-
-            // Save the completed cycle time and reset for new cycle
-            lastCycleTime = currentCycleTime;
-            currentCycleTime = 0;
-            currentStepIndex = 0;
-
-            // Print diagnostic header
-            PrintDiagnosticHeader();
-
-            // Build the step queue dynamically based on what blocks exist
-            BuildStepQueue();
+            Echo($"High water: {InstructionHighWater}");
         }
 
         /// <summary>
@@ -193,68 +137,6 @@ namespace IngameScript
             {
                 plotLcds[i].SetShiftSprites(shiftSprites);
             }
-        }
-
-        /// <summary>
-        /// Builds the step queue dynamically based on what blocks are currently available
-        /// </summary>
-        void BuildStepQueue()
-        {
-            stepQueue.Clear();
-
-            // Discovery is expensive and the grid rarely changes, so it runs on an interval
-            // or on demand rather than every cycle.
-            if (IsDiscoveryDue())
-            {
-                stepQueue.Add(FindFarmLCDBlocks);
-                stepQueue.Add(FindPlotLCDBlocks);
-            }
-
-            // Only print headers if we have FarmLCD displays
-            bool hasFarmLcdDisplays = farmGroups
-                .GetAllGroups()
-                .Any(g => g.LcdPanels.Count > 0 || g.TextSurfaceProviders.Count > 0);
-
-            if (hasFarmLcdDisplays)
-            {
-                stepQueue.Add(PrintHeaders);
-            }
-
-            // Only update block state if we have farm groups
-            if (farmGroups.GetAllGroups().Any())
-            {
-                stepQueue.Add(UpdateBlockState);
-            }
-
-            // Render text displays if we have any text-mode LCDs or cockpits
-            bool hasTextDisplays = farmGroups
-                .GetAllGroups()
-                .Any(g =>
-                    g.LcdPanels.Any(p => !p.IsGraphicalMode()) || g.TextSurfaceProviders.Count > 0
-                );
-
-            if (hasTextDisplays)
-            {
-                stepQueue.Add(RenderTextDisplays);
-            }
-
-            // Render graphical displays if we have any graphical-mode LCDs
-            bool hasGraphicalDisplays = farmGroups
-                .GetAllGroups()
-                .Any(g => g.LcdPanels.Any(p => p.IsGraphicalMode()));
-
-            if (hasGraphicalDisplays)
-            {
-                stepQueue.Add(RenderGraphicalDisplays);
-            }
-
-            // Render PlotLCDs if we have any
-            if (plotLcds.Count > 0)
-            {
-                stepQueue.Add(RenderPlotLCDs);
-            }
-
-            shiftSprites = !shiftSprites;
         }
 
         /// <summary>
