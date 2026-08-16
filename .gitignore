@@ -21,3 +21,6 @@
 
 # Research
 .research/
+
+# MDK local machine-specific paths (binarypath, output), never checked in
+*.mdk.local.ini
