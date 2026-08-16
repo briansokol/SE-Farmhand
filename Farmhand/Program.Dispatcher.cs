@@ -56,7 +56,8 @@ namespace IngameScript
 
         /// <summary>
         /// Pumps the work iterator repeatedly within a single tick until the budget trips
-        /// or the iterator finishes, restarting the pipeline on fault.
+        /// or the iterator finishes. Step faults are handled inside StepRoot; the catch here
+        /// is only a last-resort backstop for anything thrown outside a step.
         /// </summary>
         void RunOneTick()
         {
@@ -74,7 +75,7 @@ namespace IngameScript
             }
             catch (Exception ex)
             {
-                Echo($"Error in step {_stepIndex} {_stepLabel}: {ex.Message}");
+                LogStepError(ex);
                 _workIterator = StepRoot();
             }
 
@@ -106,15 +107,40 @@ namespace IngameScript
                     _stepIndex = i;
                     _stepLabel = StepLabels[i];
                     IEnumerator<YieldReason> step = StepFor(i);
-                    // Explicit MoveNext pump rather than foreach, so exceptions thrown by
-                    // child iterators propagate cleanly to RunOneTick's catch.
-                    while (step.MoveNext())
+                    // Explicit MoveNext pump rather than foreach, so a faulting step can be
+                    // abandoned without abandoning the cycle. C# forbids yield inside a try
+                    // that has a catch, so only the MoveNext call sits inside the try.
+                    while (true)
                     {
+                        bool moved;
+                        try
+                        {
+                            moved = step.MoveNext();
+                        }
+                        catch (Exception ex)
+                        {
+                            // Skip the rest of this step and continue the cycle, matching the
+                            // pre-2.0 handler. Restarting the whole pipeline here would mean a
+                            // reproducible fault in an early step permanently starves every
+                            // later step, freezing displays with no visible cause.
+                            LogStepError(ex);
+                            break;
+                        }
+                        if (!moved)
+                        {
+                            break;
+                        }
                         yield return step.Current;
                     }
                     yield return YieldReason.ChunkBoundary;
                 }
             }
+        }
+
+        /// <summary>Records a step fault on the programmable block screen.</summary>
+        void LogStepError(Exception ex)
+        {
+            Echo($"Error in step {_stepIndex} {_stepLabel}: {ex.Message}");
         }
 
         /// <summary>Returns the iterator for the step at the given index.</summary>

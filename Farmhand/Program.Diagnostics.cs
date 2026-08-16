@@ -48,8 +48,11 @@ namespace IngameScript
         {
             Echo("Farmhand");
             Echo($"{Version} | {PublishedDate}");
-            Echo(_paused ? "[PAUSED]" : "");
-            Echo($"Step {_stepIndex}/{StepLabels.Length}: {_stepLabel}");
+            if (_paused)
+            {
+                Echo("[PAUSED]");
+            }
+            Echo($"Step {_stepIndex + 1}/{StepLabels.Length}: {_stepLabel}");
             Echo($"Cycle {CycleNumber} | {TicksLastCycle} ticks");
             Echo($"Instr {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
             Echo($"Peak {InstructionHighWater} (limit {(int)(Runtime.MaxInstructionCount * BudgetFraction)})");

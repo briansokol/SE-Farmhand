@@ -411,7 +411,10 @@ namespace IngameScript
                     .ToString(_customDataConfigs["BudgetFraction"].DefaultValue);
 
                 float value;
-                if (float.TryParse(raw, out value))
+                // Invariant culture: on a comma-decimal locale "0.8" would otherwise parse
+                // as 8 and clamp to 0.95, silently running at a 95% budget.
+                if (float.TryParse(raw, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out value))
                 {
                     return Math.Max(0.1f, Math.Min(0.95f, value));
                 }
@@ -430,7 +433,11 @@ namespace IngameScript
                     .ToString(_customDataConfigs["RescanIntervalCycles"].DefaultValue);
 
                 int value;
-                if (int.TryParse(raw, out value))
+                // Invariant culture for the same reason as BudgetFraction. Integer parsing
+                // only exposes the sign symbol to the locale, but matching the form keeps
+                // both dispatcher settings locale independent.
+                if (int.TryParse(raw, System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out value))
                 {
                     return value < 1 ? 1 : value;
                 }

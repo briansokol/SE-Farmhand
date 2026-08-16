@@ -136,7 +136,11 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Writes text to the internal buffer if the category is set to be visible
+        /// Writes text to the internal buffer if the category is set to be visible.
+        /// Graphical panels are skipped entirely: nothing ever flushes their text buffer
+        /// (FlushTextToScreen is only called for non-graphical panels), so appending here
+        /// would grow the buffer without bound now that wrappers persist across cycles.
+        /// Skipping also avoids the per-message INI reads this method would otherwise do.
         /// </summary>
         /// <param name="text">Text to display</param>
         /// <param name="category">The category of the text</param>
@@ -149,7 +153,7 @@ namespace IngameScript
             int runNumber = 0
         )
         {
-            if (IsFunctional() && _lcdPanel != null)
+            if (IsFunctional() && _lcdPanel != null && !IsGraphicalMode())
             {
                 if (category == null || IsCategoryVisible(category))
                 {
