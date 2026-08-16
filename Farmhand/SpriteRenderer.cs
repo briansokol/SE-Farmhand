@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Sandbox.ModAPI.Ingame;
@@ -68,6 +69,12 @@ namespace IngameScript
         // Cached layout to avoid recalculation when plot list hasn't changed
         private List<LayoutRow> _cachedLayoutRows;
         private int _cachedPlotCount = -1;
+
+        /// <summary>
+        /// Plots drawn between chunk boundaries, matching ScanChunkSize in Program.Scan.cs so
+        /// the two per-plot loops in the pipeline cost about the same per chunk.
+        /// </summary>
+        private const int PlotsPerChunk = 20;
 
         // Reusable sprite buffer for DrawGraphicalUI, so that path allocates nothing per render
         private readonly List<MySprite> _spriteBuffer = new List<MySprite>();
@@ -232,7 +239,11 @@ namespace IngameScript
         {
             PrepareSurface();
             _spriteBuffer.Clear();
-            BuildSprites(_spriteBuffer);
+            // Drains the builder in one call. This path is reached from TextSurfaceProvider,
+            // which has no pipeline step of its own to spread the work across, so its
+            // graphical screens still build as a single unyielded unit.
+            IEnumerator build = BuildSprites(_spriteBuffer);
+            while (build.MoveNext()) { }
             if (_spriteBuffer.Count == 0) return;
 
             using (var frame = _surface.DrawFrame())
@@ -260,17 +271,17 @@ namespace IngameScript
         /// because the helpers it delegates to were written against a draw frame; it is an
         /// ordinary list here.
         /// </summary>
-        public void BuildSprites(List<MySprite> frame)
+        public IEnumerator BuildSprites(List<MySprite> frame)
         {
             if (!_isScreenSizeSupported)
             {
                 DrawUnsupportedScreenMessage(frame);
-                return;
+                yield break;
             }
 
             if (_farmGroup == null || _farmGroup.FarmPlots.Count == 0)
             {
-                return;
+                yield break;
             }
 
             // Shift sprite array every other render to force redraw on server clients
@@ -288,42 +299,64 @@ namespace IngameScript
             // Start just below the header (with double spacing)
             float currentY = RectHeight / 2 + _headerFontHeight + _spacing * 4;
 
-            // Draw each layout row
-            foreach (var layoutRow in layoutRows)
+            // Draw each layout row. Indexed rather than foreach, matching how _groupSnapshot is
+            // walked in the pipeline steps: an enumerator suspended across ticks throws if its
+            // list is mutated. GetOrComputeLayoutRows returns a freshly built list today, so
+            // foreach would also be safe, but the idiom is what keeps that from mattering.
+            for (int r = 0; r < layoutRows.Count; r++)
             {
+                LayoutRow layoutRow = layoutRows[r];
                 int maxRowsInThisLayoutRow = 0;
 
                 // Process left column (always present)
                 if (layoutRow.LeftGroup != null)
                 {
-                    int rowsInLeftGroup = DrawColumn(
-                        frame,
-                        layoutRow.LeftGroup,
-                        _leftMargin,
-                        currentY
-                    );
-                    maxRowsInThisLayoutRow = rowsInLeftGroup;
+                    List<FarmPlot> leftPlots = layoutRow.LeftGroup.ToList();
+                    maxRowsInThisLayoutRow = RowsForColumn(leftPlots.Count);
+                    IEnumerator left = DrawColumn(frame, leftPlots, _leftMargin, currentY);
+                    while (left.MoveNext())
+                    {
+                        yield return null;
+                    }
                 }
 
                 // Process right column (if present)
                 if (layoutRow.RightGroup != null)
                 {
-                    int rowsInRightGroup = DrawColumn(
-                        frame,
-                        layoutRow.RightGroup,
-                        _viewport.Width / 2f + _leftMargin,
-                        currentY
-                    );
+                    List<FarmPlot> rightPlots = layoutRow.RightGroup.ToList();
+                    int rowsInRightGroup = RowsForColumn(rightPlots.Count);
                     if (rowsInRightGroup > maxRowsInThisLayoutRow)
                     {
                         maxRowsInThisLayoutRow = rowsInRightGroup;
+                    }
+                    IEnumerator right = DrawColumn(
+                        frame,
+                        rightPlots,
+                        _viewport.Width / 2f + _leftMargin,
+                        currentY
+                    );
+                    while (right.MoveNext())
+                    {
+                        yield return null;
                     }
                 }
 
                 // Move to next layout row (based on tallest group in this row, with double spacing)
                 currentY +=
                     maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing * 2;
+
+                yield return null;
             }
+        }
+
+        /// <summary>
+        /// Rows a column of the given plot count occupies. A pure function of the count, which
+        /// is why DrawColumn no longer returns it: an iterator cannot return a value, and the
+        /// caller needs this before the column has finished drawing.
+        /// </summary>
+        private int RowsForColumn(int plotCount)
+        {
+            return (plotCount + _plotsPerRow - 1) / _plotsPerRow;
         }
 
         /// <summary>
@@ -427,23 +460,21 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Draws a column of farm plots with an optional group icon
+        /// Draws a column of farm plots with an optional group icon, yielding every
+        /// PlotsPerChunk plots so a large single-plant group does not become one
+        /// uninterruptible chunk. Use RowsForColumn for the row count.
         /// </summary>
         /// <param name="frame">The sprite frame to add sprites to</param>
-        /// <param name="group">The group of plots to draw</param>
+        /// <param name="plots">The plots to draw, already materialised by the caller</param>
         /// <param name="columnStartX">X position where the column starts</param>
         /// <param name="currentY">Y position where the column starts</param>
-        /// <returns>Number of rows used by this column</returns>
-        private int DrawColumn(
+        private IEnumerator DrawColumn(
             List<MySprite> frame,
-            IGrouping<string, FarmPlot> group,
+            List<FarmPlot> plots,
             float columnStartX,
             float currentY
         )
         {
-            string plantType = group.Key;
-            var plots = group.ToList();
-
             // Draw group icon
             DrawGroupIcon(frame, columnStartX, currentY, plots);
 
@@ -469,10 +500,12 @@ namespace IngameScript
                 );
 
                 DrawFarmPlot(frame, x, y, plot, renderState);
-            }
 
-            // Return number of rows used
-            return (plots.Count + _plotsPerRow - 1) / _plotsPerRow;
+                if ((i + 1) % PlotsPerChunk == 0)
+                {
+                    yield return null;
+                }
+            }
         }
 
         /// <summary>

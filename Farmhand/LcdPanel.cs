@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
@@ -272,13 +273,17 @@ namespace IngameScript
         /// Appends this panel's sprites to the supplied buffer without opening a draw frame,
         /// so the expensive layout work can be spread across ticks.
         /// </summary>
-        public void BuildSprites(List<MySprite> target, bool shiftSprites)
+        public IEnumerator BuildSprites(List<MySprite> target, bool shiftSprites)
         {
-            if (!IsFunctional() || _lcdPanel == null || !IsGraphicalMode()) return;
+            if (!IsFunctional() || _lcdPanel == null || !IsGraphicalMode()) yield break;
 
             var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle(), shiftSprites);
             renderer.PrepareSurface();
-            renderer.BuildSprites(target);
+            IEnumerator build = renderer.BuildSprites(target);
+            while (build.MoveNext())
+            {
+                yield return null;
+            }
         }
 
         /// <summary>

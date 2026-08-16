@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Sandbox.ModAPI.Ingame;
@@ -336,7 +337,14 @@ namespace IngameScript
                     }
                     buffer.Clear();
 
-                    panel.BuildSprites(buffer, shiftSprites);
+                    // Relay the panel's chunks rather than draining it here: the sprite build
+                    // is O(plots) per panel, so on a large farm one panel alone would exceed
+                    // the budget in a single uninterruptible call.
+                    IEnumerator sprites = panel.BuildSprites(buffer, shiftSprites);
+                    while (sprites.MoveNext())
+                    {
+                        yield return YieldReason.ChunkBoundary;
+                    }
 
                     yield return YieldReason.ChunkBoundary;
                     if (BudgetExceeded()) yield return YieldReason.BudgetHit;
