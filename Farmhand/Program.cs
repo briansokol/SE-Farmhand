@@ -427,7 +427,7 @@ namespace IngameScript
                         lightInputs.IsFullyGrown = farmPlot.IsPlantFullyGrown;
                         lightInputs.HasDetails = plotDetails != null;
                         lightInputs.CropHealth = plotDetails != null ? plotDetails.CropHealth : 0f;
-                        // FarmPlot.WaterFilledRatio is double (FarmPlot.cs:154); the cast is required.
+                        // FarmPlot.WaterFilledRatio is double (FarmPlot.cs:189); the cast is required.
                         lightInputs.WaterFilledRatio = (float)farmPlot.WaterFilledRatio;
                         lightInputs.HealthLowThreshold = healthLowThreshold;
                         lightInputs.WaterLowThreshold = waterLowThreshold;

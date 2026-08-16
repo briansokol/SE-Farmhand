@@ -120,6 +120,31 @@ namespace Farmhand.Tests
         }
 
         [Fact]
+        public void DeadPlant_NotFullyGrown_WithLowWater_IsRepaintedWaterLow()
+        {
+            // isHealthLow is false because IsAlive is false, and isReady is false
+            // because IsFullyGrown is false, so both water-override guards pass and
+            // the dead plot is repainted.
+            var d = FarmPlot.DecidePlotLight(Inputs(true, false, false, 0f, 0.01f));
+
+            d.Role.Should().Be(PlotLightRole.WaterLow);
+            d.BlinkInterval.Should().Be(2f);
+            d.BlinkLength.Should().Be(50f);
+        }
+
+        [Fact]
+        public void DeadPlant_FullyGrown_WithLowWater_StaysDead()
+        {
+            // isReady is true here (IsPlanted and IsFullyGrown), which blocks the
+            // water override, so the plot keeps the Dead role and resets its blink.
+            var d = FarmPlot.DecidePlotLight(Inputs(true, false, true, 0f, 0.01f));
+
+            d.Role.Should().Be(PlotLightRole.Dead);
+            d.BlinkInterval.Should().Be(0f);
+            d.BlinkLength.Should().Be(1f);
+        }
+
+        [Fact]
         public void GrowingPlot_WithLowWater_IsWaterLowAndBlinking()
         {
             var d = FarmPlot.DecidePlotLight(Inputs(true, true, false, 0.9f, 0.01f));
