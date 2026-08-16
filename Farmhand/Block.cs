@@ -26,9 +26,18 @@ namespace IngameScript
     /// </summary>
     internal abstract class Block
     {
+        /// <summary>
+        /// The cycle all per-block caches are gated on, published once per cycle by Program.
+        /// Static because Block holds its host as MyGridProgram, and a programmable block
+        /// script has exactly one Program instance.
+        /// </summary>
+        internal static int CurrentCycle;
+
         protected readonly MyIni _customData = new MyIni();
         protected readonly string _customDataHeader = "Farmhand";
         protected readonly MyGridProgram _program;
+        int _checkedCycle = -1;
+        string _lastRaw;
 
         // Abstract properties that must be implemented by derived classes
         public abstract IMyTerminalBlock BlockInstance { get; }
@@ -106,24 +115,47 @@ namespace IngameScript
                     _customDataHeader,
                     "; For more detailed explanations of options, see the official guide on Steam"
                 );
-                BlockInstance.CustomData = _customData.ToString();
+                string rendered = _customData.ToString();
+                if (rendered != BlockInstance.CustomData)
+                {
+                    BlockInstance.CustomData = rendered;
+                }
+                // Record what we just wrote (or confirmed) so the next cycle does not mistake
+                // our own write for an external edit and re-parse needlessly.
+                _lastRaw = rendered;
             }
         }
 
         /// <summary>
-        /// Parses custom data from the block's CustomData property into the internal INI structure
+        /// Ensures the parsed INI view matches the block's CustomData.
+        /// Reads the raw string at most once per cycle and re-parses only when it actually
+        /// changed, so repeated getter calls within a cycle cost one integer comparison.
         /// </summary>
         public void ParseCustomData()
         {
-            if (CustomDataConfigs != null && CustomDataConfigs.Count > 0 && IsFunctional())
+            if (CustomDataConfigs == null || CustomDataConfigs.Count == 0 || !IsFunctional())
             {
-                MyIniParseResult result;
-                if (!_customData.TryParse(BlockInstance.CustomData, out result))
-                {
-                    _program.Echo($"Cannot Parse Custom Data in: {BlockInstance.CustomName}");
-                    // throw new Exception(result.ToString());
-                }
+                return;
             }
+
+            if (_checkedCycle == CurrentCycle)
+            {
+                return;
+            }
+            _checkedCycle = CurrentCycle;
+
+            string raw = BlockInstance.CustomData;
+            if (raw == _lastRaw)
+            {
+                return;
+            }
+
+            MyIniParseResult result;
+            if (!_customData.TryParse(raw, out result))
+            {
+                _program.Echo($"Cannot Parse Custom Data in: {BlockInstance.CustomName}");
+            }
+            _lastRaw = raw;
         }
 
         /// <summary>

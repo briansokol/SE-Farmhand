@@ -22,6 +22,13 @@ namespace IngameScript
         readonly string Version = "v1.3.0";
         readonly string PublishedDate = "2026-03-22";
 
+        /// <summary>
+        /// Increments once per completed pipeline cycle. Every per-block cache gates on this
+        /// rather than on tick count, because a cycle can span many ticks on a large farm and
+        /// configuration must stay stable for the whole of it.
+        /// </summary>
+        public int CycleNumber { get; private set; }
+
         // Step-based state machine management
         delegate void Step();
         readonly List<Step> stepQueue = new List<Step>();
@@ -106,6 +113,9 @@ namespace IngameScript
         /// </summary>
         void RestartCycle()
         {
+            CycleNumber++;
+            Block.CurrentCycle = CycleNumber;
+
             // Save the completed cycle time and reset for new cycle
             lastCycleTime = currentCycleTime;
             currentCycleTime = 0;
