@@ -25,7 +25,7 @@ namespace IngameScript
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs => null;
 
         // Used to force redraw of sprites on server clients
-        private readonly bool _shiftSprites;
+        private bool _shiftSprites;
 
         /// <summary>
         /// Gets whether this LCD has the correct resolution (512x73)
@@ -61,6 +61,16 @@ namespace IngameScript
             _gridProgram = program;
             _shiftSprites = shiftSprites;
             CheckResolution();
+        }
+
+        /// <summary>
+        /// Updates the per-cycle sprite shift flag. Set every cycle by Program rather than
+        /// at construction, because wrappers now persist across cycles and a frozen flag
+        /// stops multiplayer clients from redrawing.
+        /// </summary>
+        internal void SetShiftSprites(bool value)
+        {
+            _shiftSprites = value;
         }
 
         /// <summary>

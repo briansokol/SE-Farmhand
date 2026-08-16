@@ -15,7 +15,7 @@ namespace IngameScript
         private FarmGroup _farmGroup;
 
         // Used to force redraw of sprites on server clients
-        private readonly bool _shiftSprites;
+        private bool _shiftSprites;
 
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
@@ -105,6 +105,16 @@ namespace IngameScript
             _lcdPanel = lcdPanel;
             _shiftSprites = shiftSprites;
             UpdateCustomData();
+        }
+
+        /// <summary>
+        /// Updates the per-cycle sprite shift flag. Set every cycle by Program rather than
+        /// at construction, because wrappers now persist across cycles and a frozen flag
+        /// stops multiplayer clients from redrawing.
+        /// </summary>
+        internal void SetShiftSprites(bool value)
+        {
+            _shiftSprites = value;
         }
 
         /// <summary>

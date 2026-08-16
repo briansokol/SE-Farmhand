@@ -29,6 +29,42 @@ namespace IngameScript
         /// </summary>
         public int CycleNumber { get; private set; }
 
+        /// <summary>Set to force a discovery rescan on the next cycle.</summary>
+        public bool RescanRequested { get; set; }
+
+        /// <summary>Cycles between periodic discovery rescans.</summary>
+        public int RescanIntervalCycles = 30;
+
+        int _lastDiscoveryCycle = int.MinValue;
+
+        // Persistent EntityId to wrapper indexes for the tag-discovered display blocks. These
+        // live on Program rather than on FarmGroup because the wrappers are constructed before
+        // their group name is known: the group name is read from the wrapper's own custom data.
+        readonly Dictionary<long, PlotLCD> _plotLcdsById = new Dictionary<long, PlotLCD>();
+        readonly Dictionary<long, LcdPanel> _lcdPanelsById = new Dictionary<long, LcdPanel>();
+        readonly Dictionary<long, TextSurfaceProvider> _textSurfaceProvidersById =
+            new Dictionary<long, TextSurfaceProvider>();
+
+        /// <summary>
+        /// True when block discovery should run this cycle: first run, an explicit request,
+        /// or the periodic interval has elapsed.
+        /// </summary>
+        bool IsDiscoveryDue()
+        {
+            if (RescanRequested)
+                return true;
+            if (_lastDiscoveryCycle == int.MinValue)
+                return true;
+            return CycleNumber - _lastDiscoveryCycle >= RescanIntervalCycles;
+        }
+
+        /// <summary>Records that discovery ran this cycle and clears any pending request.</summary>
+        void MarkDiscoveryDone()
+        {
+            _lastDiscoveryCycle = CycleNumber;
+            RescanRequested = false;
+        }
+
         // Step-based state machine management
         delegate void Step();
         readonly List<Step> stepQueue = new List<Step>();
@@ -115,6 +151,7 @@ namespace IngameScript
         {
             CycleNumber++;
             Block.CurrentCycle = CycleNumber;
+            ApplyFrameState();
 
             // Save the completed cycle time and reset for new cycle
             lastCycleTime = currentCycleTime;
@@ -129,17 +166,49 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Pushes per-cycle animation state onto persistent wrappers. Must run every cycle,
+        /// not only when discovery runs, or blinking and multiplayer sprite refresh stall.
+        /// </summary>
+        void ApplyFrameState()
+        {
+            // Advance the animation frame. This lived inside PrintDiagnosticHeader, which was
+            // only ever called from RestartCycle. Frame advancement now has exactly one owner.
+            runNumber = runNumber >= 5 ? 0 : runNumber + 1;
+
+            foreach (FarmGroup group in farmGroups.GetAllGroups())
+            {
+                group.RunNumber = runNumber;
+
+                for (int i = 0; i < group.LcdPanels.Count; i++)
+                {
+                    group.LcdPanels[i].SetShiftSprites(shiftSprites);
+                }
+                for (int i = 0; i < group.TextSurfaceProviders.Count; i++)
+                {
+                    group.TextSurfaceProviders[i].SetShiftSprites(shiftSprites);
+                }
+            }
+
+            for (int i = 0; i < plotLcds.Count; i++)
+            {
+                plotLcds[i].SetShiftSprites(shiftSprites);
+            }
+        }
+
+        /// <summary>
         /// Builds the step queue dynamically based on what blocks are currently available
         /// </summary>
         void BuildStepQueue()
         {
             stepQueue.Clear();
 
-            // Always find FarmLCD blocks first
-            stepQueue.Add(FindFarmLCDBlocks);
-
-            // Always find PlotLCD blocks
-            stepQueue.Add(FindPlotLCDBlocks);
+            // Discovery is expensive and the grid rarely changes, so it runs on an interval
+            // or on demand rather than every cycle.
+            if (IsDiscoveryDue())
+            {
+                stepQueue.Add(FindFarmLCDBlocks);
+                stepQueue.Add(FindPlotLCDBlocks);
+            }
 
             // Only print headers if we have FarmLCD displays
             bool hasFarmLcdDisplays = farmGroups
@@ -198,15 +267,6 @@ namespace IngameScript
                 "Farmhand",
                 TextAlignment.LEFT
             );
-
-            if (runNumber >= 5)
-            {
-                runNumber = 0;
-            }
-            else
-            {
-                runNumber += 1;
-            }
 
             WriteToDiagnosticOutput(header, true);
             WriteToDiagnosticOutput($"{Version} | {PublishedDate}", true);
@@ -311,11 +371,33 @@ namespace IngameScript
             {
                 if (TextSurfaceProvider.BlockIsValid(block))
                 {
-                    surfaceProviders.Add(new TextSurfaceProvider(block, this, shiftSprites));
+                    TextSurfaceProvider provider;
+                    if (!_textSurfaceProvidersById.TryGetValue(block.EntityId, out provider))
+                    {
+                        provider = new TextSurfaceProvider(block, this, shiftSprites);
+                        _textSurfaceProvidersById[block.EntityId] = provider;
+                    }
+                    else
+                    {
+                        // Reused wrapper: the constructor's UpdateCustomData no longer runs
+                        // every cycle, so restore a config key the player deleted here.
+                        provider.UpdateCustomData();
+                    }
+                    surfaceProviders.Add(provider);
                 }
                 else if (LcdPanel.BlockIsValid(block as IMyFunctionalBlock))
                 {
-                    lcdPanels.Add(new LcdPanel(block as IMyTextPanel, this, shiftSprites));
+                    LcdPanel lcdPanel;
+                    if (!_lcdPanelsById.TryGetValue(block.EntityId, out lcdPanel))
+                    {
+                        lcdPanel = new LcdPanel(block as IMyTextPanel, this, shiftSprites);
+                        _lcdPanelsById[block.EntityId] = lcdPanel;
+                    }
+                    else
+                    {
+                        lcdPanel.UpdateCustomData();
+                    }
+                    lcdPanels.Add(lcdPanel);
                 }
             });
 
@@ -353,7 +435,6 @@ namespace IngameScript
 
                 var group = farmGroups.GetGroup(groupName);
                 group.ProgrammableBlock = thisPb;
-                group.RunNumber = runNumber;
 
                 farmGroups.FindFarmPlots(groupName);
                 farmGroups.FindIrrigationSystems(groupName);
@@ -380,7 +461,12 @@ namespace IngameScript
             {
                 if (PlotLCD.BlockIsValid(block))
                 {
-                    var plotLcd = new PlotLCD(block as IMyTextPanel, this, shiftSprites);
+                    PlotLCD plotLcd;
+                    if (!_plotLcdsById.TryGetValue(block.EntityId, out plotLcd))
+                    {
+                        plotLcd = new PlotLCD(block as IMyTextPanel, this, shiftSprites);
+                        _plotLcdsById[block.EntityId] = plotLcd;
+                    }
                     plotLcds.Add(plotLcd);
 
                     // Find nearby farm plot (only if resolution is correct)
@@ -390,6 +476,8 @@ namespace IngameScript
                     }
                 }
             });
+
+            MarkDiscoveryDone();
         }
 
         /// <summary>
@@ -424,6 +512,13 @@ namespace IngameScript
                         var plantType = farmPlot.PlantType;
                         var plantYield = farmPlot.PlantYieldAmount;
                         var plotDetails = farmPlot.GetPlotDetails();
+
+                        if (!farmPlot.IsPresent())
+                        {
+                            // A block we still hold a wrapper for has left the grid. Force
+                            // discovery on the next cycle rather than waiting out the interval.
+                            RescanRequested = true;
+                        }
 
                         if (plotDetails != null)
                         {

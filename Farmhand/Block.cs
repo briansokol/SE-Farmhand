@@ -61,6 +61,17 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// True when the underlying block still exists on the grid, regardless of whether it
+        /// is switched on. Distinct from IsFunctional(), which also requires Enabled, and is
+        /// therefore wrong for cache invalidation: a player switching a block off must not
+        /// discard its wrapper or trigger a rediscovery.
+        /// </summary>
+        public bool IsPresent()
+        {
+            return BlockInstance != null && !BlockInstance.Closed;
+        }
+
+        /// <summary>
         /// Gets the custom name of the farm plot block
         /// </summary>
         public string CustomName =>
@@ -88,7 +99,7 @@ namespace IngameScript
         /// <summary>
         /// Updates the block's custom data with current configuration values
         /// </summary>
-        protected void UpdateCustomData()
+        internal void UpdateCustomData()
         {
             if (CustomDataConfigs != null && CustomDataConfigs.Count > 0 && IsFunctional())
             {
