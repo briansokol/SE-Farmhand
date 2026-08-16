@@ -321,12 +321,79 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Placeholder; Task 10 publishes each group's scratch buffer into Stats and
-        /// evaluates the StateManager events that the scan steps no longer raise.
+        /// Publishes the completed scan and evaluates every state transition against it.
+        /// All StateManager calls live here rather than in the scan, because a threshold
+        /// crossed by a partially accumulated statistic would fire real in-game hardware
+        /// and then fire its inverse on the following tick.
         /// </summary>
         IEnumerator<YieldReason> StepCommitSnapshot()
         {
-            yield return YieldReason.ChunkBoundary;
+            // _groupSnapshot can be refreshed mid-cycle by StepDiscoveryIfDue, so the count
+            // is re-read each iteration and the group is never held across a yield.
+            for (int g = 0; g < _groupSnapshot.Count; g++)
+            {
+                FarmGroup farmGroup = _groupSnapshot[g];
+
+                // Publish by SWAPPING. Never alias Stats = ScratchStats.
+                // BuildMessagesForGroup writes into the published buffer (for example
+                // stats.AlertMessages.Add("No Working Irrigation Systems!")), and only the
+                // scratch buffer is ever cleared. Aliasing the two would make every render
+                // append to a list nothing clears, growing without bound for the session.
+                FarmStats completed = farmGroup.ScratchStats;
+                farmGroup.ScratchStats = farmGroup.Stats;
+                farmGroup.Stats = completed;
+
+                // The original evaluated EVERY state inside `if (farmGroup.FarmPlots.Count > 0)`.
+                // A group with no farm plots fired no events at all, including air vent and
+                // water tank events. Preserve that exactly.
+                if (farmGroup.FarmPlots.Count > 0)
+                {
+                    StateManager state = farmGroup.StateManager;
+
+                    state.UpdateState("OnCropDying", completed.DyingPlants > 0);
+                    state.UpdateState("OnWaterLow", completed.FarmPlotsLowOnWater > 0);
+
+                    // The original fired this only inside the vent status switch, so with no
+                    // vents present it was never called at all.
+                    if (farmGroup.AirVents.Count > 0)
+                    {
+                        state.UpdateState("OnPressurized", completed.IsPressurized);
+                    }
+
+                    // Strict <, and only when irrigation systems exist.
+                    if (farmGroup.IrrigationSystems.Count > 0)
+                    {
+                        state.UpdateState("OnIceLow", completed.IceRatio < thisPb.IceLowThreshold);
+                    }
+
+                    // Strict <, with an explicit false when no tanks exist. The false is
+                    // load-bearing: it prevents spurious events for a group without tanks.
+                    if (farmGroup.WaterTanks.Count > 0)
+                    {
+                        state.UpdateState(
+                            "OnWaterTankLow",
+                            completed.WaterRatio < thisPb.WaterTankLowThreshold
+                        );
+                    }
+                    else
+                    {
+                        state.UpdateState("OnWaterTankLow", false);
+                    }
+
+                    state.UpdateState("OnCropDead", completed.DeadPlants > 0);
+                    // OnCropAvailable tracks empty planters needing seeds, NOT ready crops.
+                    state.UpdateState("OnCropAvailable", completed.SeedsNeeded > 0);
+                    state.UpdateState("OnCropReady", completed.FarmPlotsReadyToHarvest > 0);
+                    state.UpdateState(
+                        "OnAllCropsReady",
+                        completed.TotalPlantedPlots > 0
+                            && completed.FarmPlotsReadyToHarvest == completed.TotalPlantedPlots
+                    );
+                }
+
+                yield return YieldReason.ChunkBoundary;
+                if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+            }
         }
     }
 }
