@@ -30,6 +30,14 @@ namespace IngameScript
 
             FindPlotLCDBlocks();
             MarkDiscoveryDone();
+
+            // Discovery may have added or removed groups, and StepRoot took its snapshot
+            // before this step ran. Refreshing here keeps the rest of the cycle on the real
+            // group set: a stale entry for a removed group would be resurrected as a phantom
+            // when WriteToMainOutput calls GetGroup, which creates on miss, and a newly
+            // discovered group would otherwise go unscanned until the following cycle.
+            RefreshGroupSnapshot();
+
             yield return YieldReason.ChunkBoundary;
         }
 
