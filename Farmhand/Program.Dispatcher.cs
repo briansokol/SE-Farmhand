@@ -102,6 +102,13 @@ namespace IngameScript
                 TicksThisCycle = 0;
                 InstructionHighWater = 0;
 
+                // Split the preamble off from step 0. Without this, the wrap-around from the
+                // last step of the previous cycle runs the preamble AND all of
+                // StepDiscoveryIfDue's first section, including the full-grid
+                // FindFarmLCDBlocks, in one uninterruptible MoveNext on top of whatever the
+                // tick had already spent. That is the largest unyielded unit in the script.
+                yield return YieldReason.ChunkBoundary;
+
                 for (int i = 0; i < StepLabels.Length; i++)
                 {
                     _stepIndex = i;
