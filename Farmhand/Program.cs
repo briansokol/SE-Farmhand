@@ -413,8 +413,6 @@ namespace IngameScript
                     {
                         var plantType = farmPlot.PlantType;
                         var plantYield = farmPlot.PlantYieldAmount;
-
-                        // Cache plot details to avoid repeated string parsing
                         var plotDetails = farmPlot.GetPlotDetails();
 
                         if (plotDetails != null)
@@ -422,11 +420,55 @@ namespace IngameScript
                             stats.WaterUsagePerMinute += plotDetails.WaterUsage;
                         }
 
-                        if (farmPlot.IsPlantPlanted)
+                        var lightInputs = new PlotLightInputs();
+                        lightInputs.IsFunctional = farmPlot.IsFunctional();
+                        lightInputs.IsPlanted = farmPlot.IsPlantPlanted;
+                        lightInputs.IsAlive = farmPlot.IsPlantAlive;
+                        lightInputs.IsFullyGrown = farmPlot.IsPlantFullyGrown;
+                        lightInputs.HasDetails = plotDetails != null;
+                        lightInputs.CropHealth = plotDetails != null ? plotDetails.CropHealth : 0f;
+                        // FarmPlot.WaterFilledRatio is double (FarmPlot.cs:154); the cast is required.
+                        lightInputs.WaterFilledRatio = (float)farmPlot.WaterFilledRatio;
+                        lightInputs.HealthLowThreshold = healthLowThreshold;
+                        lightInputs.WaterLowThreshold = waterLowThreshold;
+
+                        var light = FarmPlot.DecidePlotLight(lightInputs);
+
+                        if (controlLights)
                         {
-                            if (farmPlot.IsPlantAlive)
+                            switch (light.Role)
                             {
-                                // Set the plot plant count using TryGetValue for better performance
+                                case PlotLightRole.Empty:
+                                    farmPlot.SetLightColor(planterEmptyColor);
+                                    break;
+                                case PlotLightRole.Growing:
+                                    farmPlot.SetLightColor(plantedAliveColor);
+                                    break;
+                                case PlotLightRole.Ready:
+                                    farmPlot.SetLightColor(plantedReadyColor);
+                                    break;
+                                case PlotLightRole.Dead:
+                                    farmPlot.SetLightColor(plantedDeadColor);
+                                    break;
+                                case PlotLightRole.WaterLow:
+                                    farmPlot.SetLightColor(waterLowColor);
+                                    break;
+                            }
+                            farmPlot.LightBlinkInterval = light.BlinkInterval;
+                            farmPlot.LightBlinkLength = light.BlinkLength;
+                        }
+
+                        bool isHealthLow = lightInputs.IsPlanted
+                            && lightInputs.IsAlive
+                            && lightInputs.HasDetails
+                            && lightInputs.CropHealth < healthLowThreshold;
+
+                        if (lightInputs.IsPlanted)
+                        {
+                            if (lightInputs.IsAlive)
+                            {
+                                stats.TotalPlantedPlots++;
+
                                 int currentCount;
                                 if (stats.PlotSummary.TryGetValue(plantType, out currentCount))
                                 {
@@ -437,17 +479,10 @@ namespace IngameScript
                                     stats.PlotSummary[plantType] = 1;
                                 }
 
-                                // Priority: Ready to harvest > Low health warning > Growing
-                                if (farmPlot.IsPlantFullyGrown)
+                                if (lightInputs.IsFullyGrown)
                                 {
-                                    // Plant is ready to harvest - show ready color even if health is low
-                                    if (controlLights)
-                                    {
-                                        farmPlot.SetLightColor(plantedReadyColor);
-                                    }
                                     stats.FarmPlotsReadyToHarvest++;
 
-                                    // Set the yield summary using TryGetValue for better performance
                                     int currentYield;
                                     if (stats.YieldSummary.TryGetValue(plantType, out currentYield))
                                     {
@@ -458,62 +493,35 @@ namespace IngameScript
                                         stats.YieldSummary[plantType] = plantYield;
                                     }
                                 }
-                                else if (
-                                    plotDetails != null
-                                    && plotDetails.CropHealth < healthLowThreshold
-                                )
+                                else if (isHealthLow)
                                 {
-                                    // Plant is growing but health is critically low - set dead color and blink
-                                    if (controlLights)
-                                    {
-                                        farmPlot.SetLightColor(plantedDeadColor);
-                                        farmPlot.LightBlinkInterval = 2f;
-                                        farmPlot.LightBlinkLength = 50f;
-                                    }
                                     stats.AlertMessages.Add(
-                                        $"Health Low: {plotDetails.CropHealth:P1} ({(string.IsNullOrEmpty(farmPlot.PlantType) ? "" : farmPlot.PlantType + ", ")}{farmPlot.CustomName})"
+                                        $"Health Low: {plotDetails.CropHealth:P1} ({(string.IsNullOrEmpty(plantType) ? "" : plantType + ", ")}{farmPlot.CustomName})"
                                     );
                                     stats.DyingPlants++;
                                 }
-                                else
+                                else if (plotDetails != null)
                                 {
-                                    // Plant is still growing normally
-                                    if (controlLights)
-                                    {
-                                        farmPlot.SetLightColor(plantedAliveColor);
-                                    }
-
-                                    if (plotDetails != null)
-                                    {
-                                        // Use TryGetValue for better performance
-                                        float currentGrowth;
-                                        if (
-                                            !stats.GrowthSummary.TryGetValue(
-                                                plantType,
-                                                out currentGrowth
-                                            )
-                                            || (
-                                                plotDetails.GrowthProgress > currentGrowth
-                                                && plotDetails.GrowthProgress < 1f
-                                            )
+                                    float currentGrowth;
+                                    if (
+                                        !stats.GrowthSummary.TryGetValue(plantType, out currentGrowth)
+                                        || (
+                                            plotDetails.GrowthProgress > currentGrowth
+                                            && plotDetails.GrowthProgress < 1f
                                         )
-                                        {
-                                            stats.GrowthSummary[plantType] =
-                                                plotDetails.GrowthProgress;
-                                        }
+                                    )
+                                    {
+                                        stats.GrowthSummary[plantType] = plotDetails.GrowthProgress;
                                     }
                                 }
                             }
                             else
                             {
-                                // Plant is dead
-                                if (controlLights)
-                                {
-                                    farmPlot.SetLightColor(plantedDeadColor);
-                                }
                                 stats.DeadPlants++;
+                                // plotDetails can be null here; the original dereferenced it unguarded
+                                // and the swallowed NullReferenceException skipped the whole step.
                                 stats.CausesOfDeath.Add(
-                                    string.IsNullOrWhiteSpace(plotDetails.CauseOfDeath)
+                                    plotDetails == null || string.IsNullOrWhiteSpace(plotDetails.CauseOfDeath)
                                         ? "Unknown"
                                         : plotDetails.CauseOfDeath
                                 );
@@ -521,58 +529,15 @@ namespace IngameScript
                         }
                         else
                         {
-                            // No plant
-                            if (controlLights)
-                            {
-                                farmPlot.SetLightColor(planterEmptyColor);
-                            }
                             stats.SeedsNeeded += farmPlot.SeedsNeeded;
                         }
 
-                        // Check for low water (only if plant is not ready and health is OK)
-                        bool isHealthLow =
-                            farmPlot.IsPlantPlanted
-                            && farmPlot.IsPlantAlive
-                            && plotDetails != null
-                            && plotDetails.CropHealth < healthLowThreshold;
-
-                        bool isReady = farmPlot.IsPlantPlanted && farmPlot.IsPlantFullyGrown;
-
-                        if (
-                            farmPlot.IsFunctional()
-                            && farmPlot.WaterFilledRatio <= waterLowThreshold
-                            && !isHealthLow
-                            && !isReady
-                        )
+                        if (light.Role == PlotLightRole.WaterLow)
                         {
-                            if (controlLights)
-                            {
-                                farmPlot.SetLightColor(waterLowColor);
-                                farmPlot.LightBlinkInterval = 2f;
-                                farmPlot.LightBlinkLength = 50f;
-                            }
                             stats.AlertMessages.Add(
-                                $"Water Low: {farmPlot.WaterFilledRatio:P1} ({(string.IsNullOrEmpty(farmPlot.PlantType) ? "" : farmPlot.PlantType + ", ")}{farmPlot.CustomName})"
+                                $"Water Low: {farmPlot.WaterFilledRatio:P1} ({(string.IsNullOrEmpty(plantType) ? "" : plantType + ", ")}{farmPlot.CustomName})"
                             );
                             stats.FarmPlotsLowOnWater++;
-                        }
-                        else if (!isHealthLow && !isReady)
-                        {
-                            // Only turn off blinking if health is OK and plant is not ready
-                            if (controlLights)
-                            {
-                                farmPlot.LightBlinkInterval = 0f;
-                                farmPlot.LightBlinkLength = 1f;
-                            }
-                        }
-                        else if (isReady)
-                        {
-                            // Plant is ready - ensure blinking is off
-                            if (controlLights)
-                            {
-                                farmPlot.LightBlinkInterval = 0f;
-                                farmPlot.LightBlinkLength = 1f;
-                            }
                         }
                     });
 
@@ -689,15 +654,6 @@ namespace IngameScript
                         "OnCropReady",
                         stats.FarmPlotsReadyToHarvest > 0
                     );
-
-                    // Check if all planted crops are ready to harvest
-                    farmGroup.FarmPlots.ForEach(farmPlot =>
-                    {
-                        if (farmPlot.IsPlantPlanted && farmPlot.IsPlantAlive)
-                        {
-                            stats.TotalPlantedPlots++;
-                        }
-                    });
 
                     farmGroup.StateManager.UpdateState(
                         "OnAllCropsReady",

@@ -37,6 +37,41 @@ namespace IngameScript
         public string CauseOfDeath { get; set; } = string.Empty;
     }
 
+    /// <summary>Which configured colour a farm plot light should display.</summary>
+    public enum PlotLightRole
+    {
+        Empty,
+        Growing,
+        Ready,
+        Dead,
+        WaterLow
+    }
+
+    /// <summary>Plain inputs to the plot light decision, free of Space Engineers types.</summary>
+    public struct PlotLightInputs
+    {
+        public bool IsFunctional;
+        public bool IsPlanted;
+        public bool IsAlive;
+        public bool IsFullyGrown;
+
+        /// <summary>False when plot details could not be read, making CropHealth untrustworthy.</summary>
+        public bool HasDetails;
+
+        public float CropHealth;
+        public float WaterFilledRatio;
+        public float HealthLowThreshold;
+        public float WaterLowThreshold;
+    }
+
+    /// <summary>Resolved light appearance for a farm plot.</summary>
+    public struct PlotLightDecision
+    {
+        public PlotLightRole Role;
+        public float BlinkInterval;
+        public float BlinkLength;
+    }
+
     /// <summary>
     /// Manages agricultural plots with plant monitoring, lighting control, and harvest tracking
     /// </summary>
@@ -270,6 +305,68 @@ namespace IngameScript
             if (percentageValues.Count > 1) details.CropHealth = percentageValues[1];
 
             return details;
+        }
+
+        /// <summary>
+        /// Resolves the light role and blink settings for a plot.
+        /// Reproduces the original two-pass ordering: plant state selects a role first,
+        /// then water state can override both the role and the blink settings.
+        /// </summary>
+        public static PlotLightDecision DecidePlotLight(PlotLightInputs inputs)
+        {
+            PlotLightDecision decision;
+            decision.Role = PlotLightRole.Empty;
+            decision.BlinkInterval = 0f;
+            decision.BlinkLength = 1f;
+
+            bool isHealthLow = inputs.IsPlanted
+                && inputs.IsAlive
+                && inputs.HasDetails
+                && inputs.CropHealth < inputs.HealthLowThreshold;
+
+            bool isReady = inputs.IsPlanted && inputs.IsFullyGrown;
+
+            // Pass one: plant state selects the role.
+            if (inputs.IsPlanted)
+            {
+                if (!inputs.IsAlive)
+                {
+                    decision.Role = PlotLightRole.Dead;
+                }
+                else if (inputs.IsFullyGrown)
+                {
+                    // Ready to harvest wins even when health is low.
+                    decision.Role = PlotLightRole.Ready;
+                }
+                else if (isHealthLow)
+                {
+                    decision.Role = PlotLightRole.Dead;
+                    decision.BlinkInterval = 2f;
+                    decision.BlinkLength = 50f;
+                }
+                else
+                {
+                    decision.Role = PlotLightRole.Growing;
+                }
+            }
+
+            // Pass two: water state can override. A low-health plot keeps its blink.
+            if (inputs.IsFunctional
+                && inputs.WaterFilledRatio <= inputs.WaterLowThreshold
+                && !isHealthLow
+                && !isReady)
+            {
+                decision.Role = PlotLightRole.WaterLow;
+                decision.BlinkInterval = 2f;
+                decision.BlinkLength = 50f;
+            }
+            else if (!isHealthLow || isReady)
+            {
+                decision.BlinkInterval = 0f;
+                decision.BlinkLength = 1f;
+            }
+
+            return decision;
         }
 
         /// <summary>
