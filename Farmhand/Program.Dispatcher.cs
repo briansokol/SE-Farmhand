@@ -39,6 +39,16 @@ namespace IngameScript
         /// <summary>Highest instruction count observed during the current cycle.</summary>
         public int InstructionHighWater { get; private set; }
 
+        /// <summary>
+        /// Cost of the most expensive single uninterruptible chunk in the current cycle.
+        /// The peak per run is the budget guard plus this, so this is the number that
+        /// decides how much headroom BudgetFraction has to leave.
+        /// </summary>
+        public int WorstChunkCost { get; private set; }
+
+        /// <summary>Step the worst chunk of the current cycle belonged to.</summary>
+        public string WorstChunkStep { get; private set; }
+
         static readonly string[] StepLabels =
         {
             "Discovery", "Config", "ScanPlots", "ScanSupport", "Commit",
@@ -66,10 +76,22 @@ namespace IngameScript
             {
                 do
                 {
+                    int before = Runtime.CurrentInstructionCount;
                     if (_workIterator == null || !_workIterator.MoveNext())
                     {
                         _workIterator = StepRoot();
                         break;
+                    }
+                    // The budget is checked after a chunk runs, never before, so a chunk
+                    // cannot be interrupted once entered. Recording the worst one names the
+                    // unit that has to be split if the peak ever threatens the hard ceiling.
+                    // _stepLabel is read after MoveNext returns, so it names the step that
+                    // just yielded rather than the one about to start.
+                    int cost = Runtime.CurrentInstructionCount - before;
+                    if (cost > WorstChunkCost)
+                    {
+                        WorstChunkCost = cost;
+                        WorstChunkStep = _stepLabel;
                     }
                 } while (!BudgetExceeded());
             }
@@ -101,6 +123,12 @@ namespace IngameScript
                 TicksLastCycle = TicksThisCycle;
                 TicksThisCycle = 0;
                 InstructionHighWater = 0;
+                WorstChunkCost = 0;
+
+                // Named so the worst-chunk diagnostic attributes the preamble to itself
+                // rather than to whichever step happened to run last.
+                _stepLabel = "Preamble";
+                _stepIndex = -1;
 
                 // Split the preamble off from step 0. Without this, the wrap-around from the
                 // last step of the previous cycle runs the preamble AND all of

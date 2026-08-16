@@ -56,6 +56,7 @@ namespace IngameScript
             Echo($"Cycle {CycleNumber} | {TicksLastCycle} ticks");
             Echo($"Instr {Runtime.CurrentInstructionCount}/{Runtime.MaxInstructionCount}");
             Echo($"Peak {InstructionHighWater} (limit {(int)(Runtime.MaxInstructionCount * BudgetFraction)})");
+            Echo($"Worst chunk {WorstChunkCost} in {WorstChunkStep ?? "n/a"}");
 
             if (DebugLogging)
             {
