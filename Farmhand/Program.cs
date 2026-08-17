@@ -16,7 +16,7 @@ namespace IngameScript
         readonly List<PlotLCD> plotLcds = new List<PlotLCD>();
         int runNumber = 0;
         readonly string Version = "v2.0.0";
-        readonly string PublishedDate = "2026-08-16";
+        readonly string PublishedDate = "2026-08-17";
 
         /// <summary>Set to force a discovery rescan on the next cycle.</summary>
         public bool RescanRequested { get; set; }
