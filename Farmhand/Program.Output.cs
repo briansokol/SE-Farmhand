@@ -1,0 +1,427 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using Sandbox.ModAPI.Ingame;
+using SpaceEngineers.Game.ModAPI.Ingame;
+using VRage.Game.GUI.TextPanel;
+using VRage.Game.ModAPI.Ingame;
+using VRage.Game.ModAPI.Ingame.Utilities;
+using VRageMath;
+
+namespace IngameScript
+{
+    public partial class Program
+    {
+        /// <summary>
+        /// Reusable sprite accumulation buffer, keyed by the panel being built. Sprites are
+        /// accumulated across as many ticks as needed, then flushed in a single tick because
+        /// a draw frame cannot be held open across ticks.
+        /// </summary>
+        readonly Dictionary<long, List<MySprite>> _spriteBuffers = new Dictionary<long, List<MySprite>>();
+
+        /// <summary>Builds output message lines for every group and writes them to text displays.</summary>
+        IEnumerator<YieldReason> StepBuildTextOutput()
+        {
+            // The programmable block's own buffer is emptied by every FlushTextToScreen, so
+            // the diagnostic header has to be rebuilt each cycle before StepRenderText flushes
+            // it. The old per-cycle queue rebuild used to own this call.
+            PrintDiagnosticHeader();
+            yield return YieldReason.ChunkBoundary;
+
+            for (int g = 0; g < _groupSnapshot.Count; g++)
+            {
+                FarmGroup farmGroup = _groupSnapshot[g];
+                PrintHeadersForGroup(farmGroup);
+                yield return YieldReason.ChunkBoundary;
+
+                // Relay the inner iterator's chunks rather than draining it here, so a group
+                // whose message set is large stays interruptible line by line.
+                IEnumerator<YieldReason> messages = BuildMessagesForGroup(farmGroup);
+                while (messages.MoveNext())
+                {
+                    yield return messages.Current;
+                }
+
+                yield return YieldReason.ChunkBoundary;
+                if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+            }
+        }
+
+        /// <summary>
+        /// Prints header to the LCD panels and cockpits of a single farm group
+        /// </summary>
+        void PrintHeadersForGroup(FarmGroup farmGroup)
+        {
+            WriteToMainOutput(
+                farmGroup.GroupName,
+                "Farmhand",
+                "Header",
+                isHeader: true,
+                runNumber: runNumber
+            );
+            WriteToMainOutput(farmGroup.GroupName, "", "Header", isHeader: true);
+        }
+
+        /// <summary>
+        /// Builds the categorised text message lines for a single farm group from its
+        /// published statistics and appends them to the group's text displays.
+        /// Every emitted line fans out across every display in the group, so emission yields
+        /// per line rather than per category: at 22 displays the whole method measured as a
+        /// single 7,400 instruction chunk, which set the worst-case peak for the script.
+        /// The message lists themselves are cheap to compute and stay in one chunk.
+        /// </summary>
+        IEnumerator<YieldReason> BuildMessagesForGroup(FarmGroup farmGroup)
+        {
+            var groupName = farmGroup.GroupName;
+            var stats = farmGroup.Stats;
+
+            var farmPlotMessages = new List<string>();
+            var atmosphereMessages = new List<string>();
+            var irrigationMessages = new List<string>();
+            var solarFoodGeneratorMessages = new List<string>();
+            var yieldMessages = new List<string>();
+
+            if (stats.DeadPlants > 0)
+            {
+                farmPlotMessages.Add(
+                    $"Dead Plants: {stats.DeadPlants} ({string.Join(", ", stats.CausesOfDeath.Distinct())})"
+                );
+            }
+
+            if (stats.SeedsNeeded > 0)
+            {
+                farmPlotMessages.Add($"Available Plots: {stats.SeedsNeeded}");
+            }
+
+            if (stats.FarmPlotsReadyToHarvest > 0)
+            {
+                farmPlotMessages.Add($"Harvest Ready Plots: {stats.FarmPlotsReadyToHarvest}");
+            }
+
+            if (stats.WaterUsagePerMinute > 0f)
+            {
+                farmPlotMessages.Add($"Water Usage: {stats.WaterUsagePerMinute:F1} L/min");
+            }
+
+            if (!string.IsNullOrWhiteSpace(stats.VentStatusText))
+            {
+                atmosphereMessages.Add(stats.VentStatusText);
+            }
+
+            if (farmGroup.IrrigationSystems.Count > 0)
+            {
+                irrigationMessages.Add(
+                    $"Ice: {stats.IceRatio:P0} ({stats.CurrentIceKg:F1} kg / {stats.MaxIceKg:F1} kg)"
+                );
+            }
+            else
+            {
+                stats.AlertMessages.Add("No Working Irrigation Systems!");
+            }
+
+            var waterTankMessages = new List<string>();
+
+            if (farmGroup.WaterTanks.Count > 0)
+            {
+                waterTankMessages.Add(
+                    $"Water: {stats.WaterRatio:P1} ({stats.CurrentWaterL:F1} L / {stats.MaxWaterL:F1} L)"
+                );
+            }
+
+            if (farmGroup.SolarFoodGenerators.Count > 0)
+            {
+                solarFoodGeneratorMessages.Add(
+                    $"Production Rate: {stats.TotalFoodItemsPerMinute:F2} items/min"
+                );
+
+                // Format time with appropriate units
+                string timeText;
+                float timeInSeconds = stats.MinTimeRemainingUntilNextBatch;
+                if (timeInSeconds < 60f)
+                {
+                    timeText = $"{timeInSeconds:F1} sec";
+                }
+                else if (timeInSeconds < 3600f)
+                {
+                    timeText = $"{timeInSeconds / 60f:F1} min";
+                }
+                else
+                {
+                    timeText = $"{timeInSeconds / 3600f:F1} hr";
+                }
+
+                solarFoodGeneratorMessages.Add($"Next Production: {timeText}");
+            }
+
+            // Yield summary
+            if (stats.PlotSummary.Count > 0)
+            {
+                foreach (KeyValuePair<string, int> entry in stats.PlotSummary)
+                {
+                    // Use TryGetValue for better performance
+                    int plantYield;
+                    if (!stats.YieldSummary.TryGetValue(entry.Key, out plantYield))
+                    {
+                        plantYield = 0;
+                    }
+
+                    float growthProgress;
+                    if (!stats.GrowthSummary.TryGetValue(entry.Key, out growthProgress))
+                    {
+                        growthProgress = 0f;
+                    }
+
+                    var yieldText = new List<string>();
+                    if (growthProgress > 0f)
+                    {
+                        yieldText.Add($"{growthProgress:P1}");
+                    }
+                    if (plantYield > 0)
+                    {
+                        yieldText.Add($"{plantYield} Ready");
+                    }
+
+                    yieldMessages.Add(
+                        $"{entry.Key} ({entry.Value} Plot{(entry.Value == 1 ? "" : "s")}): {string.Join(", ", yieldText)}"
+                    );
+                }
+            }
+
+            // A lambda cannot yield, so each ForEach becomes a loop. Order and content of the
+            // emitted lines are unchanged.
+            if (stats.AlertMessages.Count > 0)
+            {
+                WriteToMainOutput(groupName, "Alerts", "ShowAlerts", isHeader: true);
+                for (int i = 0; i < stats.AlertMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, stats.AlertMessages[i], "ShowAlerts");
+                    yield return YieldReason.ChunkBoundary;
+                }
+                WriteToMainOutput(groupName, "", "ShowAlerts");
+            }
+
+            if (farmPlotMessages.Count > 0)
+            {
+                WriteToMainOutput(groupName, "Farm Plots", "ShowFarmPlots", isHeader: true);
+                for (int i = 0; i < farmPlotMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, farmPlotMessages[i], "ShowFarmPlots");
+                    yield return YieldReason.ChunkBoundary;
+                }
+                WriteToMainOutput(groupName, "", "ShowFarmPlots");
+            }
+
+            if (atmosphereMessages.Count > 0)
+            {
+                WriteToMainOutput(groupName, "Atmosphere", "ShowAtmosphere", isHeader: true);
+                for (int i = 0; i < atmosphereMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, atmosphereMessages[i], "ShowAtmosphere");
+                    yield return YieldReason.ChunkBoundary;
+                }
+                WriteToMainOutput(groupName, "", "ShowAtmosphere");
+            }
+
+            if (irrigationMessages.Count > 0)
+            {
+                WriteToMainOutput(groupName, "Irrigation", "ShowIrrigation", isHeader: true);
+                for (int i = 0; i < irrigationMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, irrigationMessages[i], "ShowIrrigation");
+                    yield return YieldReason.ChunkBoundary;
+                }
+                WriteToMainOutput(groupName, "", "ShowIrrigation");
+            }
+
+            if (waterTankMessages.Count > 0)
+            {
+                WriteToMainOutput(groupName, "Water Tanks", "ShowWaterTanks", isHeader: true);
+                for (int i = 0; i < waterTankMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, waterTankMessages[i], "ShowWaterTanks");
+                    yield return YieldReason.ChunkBoundary;
+                }
+                WriteToMainOutput(groupName, "", "ShowWaterTanks");
+            }
+
+            if (solarFoodGeneratorMessages.Count > 0)
+            {
+                WriteToMainOutput(
+                    groupName,
+                    "Solar Food Generators",
+                    "ShowSolarFoodGenerators",
+                    isHeader: true
+                );
+                for (int i = 0; i < solarFoodGeneratorMessages.Count; i++)
+                {
+                    WriteToMainOutput(
+                        groupName,
+                        solarFoodGeneratorMessages[i],
+                        "ShowSolarFoodGenerators"
+                    );
+                    yield return YieldReason.ChunkBoundary;
+                }
+                WriteToMainOutput(groupName, "", "ShowSolarFoodGenerators");
+            }
+
+            if (yieldMessages.Count > 0)
+            {
+                WriteToMainOutput(groupName, "Current Yield", "ShowYield", isHeader: true);
+                for (int i = 0; i < yieldMessages.Count; i++)
+                {
+                    WriteToMainOutput(groupName, yieldMessages[i], "ShowYield");
+                    yield return YieldReason.ChunkBoundary;
+                }
+                WriteToMainOutput(groupName, "", "ShowYield");
+            }
+        }
+
+        /// <summary>Flushes buffered text to each display, one display per chunk.</summary>
+        IEnumerator<YieldReason> StepRenderText()
+        {
+            // The programmable block's own screen, flushed first exactly as the
+            // original RenderTextDisplays did.
+            thisPb.FlushTextToScreen();
+            yield return YieldReason.ChunkBoundary;
+
+            for (int g = 0; g < _groupSnapshot.Count; g++)
+            {
+                FarmGroup farmGroup = _groupSnapshot[g];
+                for (int i = 0; i < farmGroup.LcdPanels.Count; i++)
+                {
+                    LcdPanel panel = farmGroup.LcdPanels[i];
+                    // Graphical panels are skipped here: LcdPanel.FlushTextToScreen calls
+                    // DrawGraphicalUI internally, which would draw them twice per cycle
+                    // alongside StepFlushGraphical.
+                    if (!panel.IsGraphicalMode())
+                    {
+                        // SetFarmGroup must precede the flush; the panel renders from it.
+                        panel.SetFarmGroup(farmGroup);
+                        panel.FlushTextToScreen();
+                    }
+                    if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+                }
+                for (int i = 0; i < farmGroup.TextSurfaceProviders.Count; i++)
+                {
+                    farmGroup.TextSurfaceProviders[i].SetFarmGroup(farmGroup);
+                    farmGroup.TextSurfaceProviders[i].FlushTextToScreens();
+                    if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+                }
+                yield return YieldReason.ChunkBoundary;
+            }
+        }
+
+        /// <summary>
+        /// Accumulates sprites for every graphical panel across as many ticks as needed.
+        /// </summary>
+        IEnumerator<YieldReason> StepBuildGraphicalSprites()
+        {
+            for (int g = 0; g < _groupSnapshot.Count; g++)
+            {
+                FarmGroup farmGroup = _groupSnapshot[g];
+                for (int i = 0; i < farmGroup.LcdPanels.Count; i++)
+                {
+                    LcdPanel panel = farmGroup.LcdPanels[i];
+                    if (!panel.IsGraphicalMode()) continue;
+
+                    // SetFarmGroup must precede the build; the panel renders from it.
+                    panel.SetFarmGroup(farmGroup);
+
+                    long id = panel.BlockInstance.EntityId;
+                    List<MySprite> buffer;
+                    if (!_spriteBuffers.TryGetValue(id, out buffer))
+                    {
+                        buffer = new List<MySprite>();
+                        _spriteBuffers[id] = buffer;
+                    }
+                    buffer.Clear();
+
+                    // Relay the panel's chunks rather than draining it here: the sprite build
+                    // is O(plots) per panel, so on a large farm one panel alone would exceed
+                    // the budget in a single uninterruptible call.
+                    IEnumerator sprites = panel.BuildSprites(buffer, shiftSprites);
+                    while (sprites.MoveNext())
+                    {
+                        yield return YieldReason.ChunkBoundary;
+                    }
+
+                    yield return YieldReason.ChunkBoundary;
+                    if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+                }
+            }
+        }
+
+        /// <summary>Flushes each accumulated sprite list in a single draw frame per panel.</summary>
+        IEnumerator<YieldReason> StepFlushGraphical()
+        {
+            for (int g = 0; g < _groupSnapshot.Count; g++)
+            {
+                FarmGroup farmGroup = _groupSnapshot[g];
+                for (int i = 0; i < farmGroup.LcdPanels.Count; i++)
+                {
+                    LcdPanel panel = farmGroup.LcdPanels[i];
+                    if (!panel.IsGraphicalMode()) continue;
+
+                    List<MySprite> buffer;
+                    if (_spriteBuffers.TryGetValue(panel.BlockInstance.EntityId, out buffer))
+                    {
+                        panel.FlushSprites(buffer);
+                    }
+
+                    yield return YieldReason.ChunkBoundary;
+                    if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+                }
+            }
+        }
+
+        /// <summary>Draws each PlotLCD, one per chunk.</summary>
+        IEnumerator<YieldReason> StepRenderPlotLCDs()
+        {
+            for (int i = 0; i < plotLcds.Count; i++)
+            {
+                plotLcds[i].Render(runNumber, thisPb);
+                yield return YieldReason.ChunkBoundary;
+                if (BudgetExceeded()) yield return YieldReason.BudgetHit;
+            }
+        }
+
+        /// <summary>
+        /// Writes text to all LCD panels and cockpits in the specified farm group
+        /// </summary>
+        /// <param name="groupName">Name of the farm group to write to</param>
+        /// <param name="text">Text content to display</param>
+        /// <param name="category">Optional category for filtering display</param>
+        /// <param name="isHeader">Whether this text is a header (headers are not indented)</param>
+        /// <param name="runNumber">Animation frame number for animated header (0-2)</param>
+        void WriteToMainOutput(
+            string groupName,
+            string text,
+            string category = null,
+            bool isHeader = false,
+            int runNumber = 0
+        )
+        {
+            var group = farmGroups.GetGroup(groupName);
+
+            group.LcdPanels.ForEach(panel =>
+            {
+                panel.AppendText(text, category, isHeader, runNumber);
+            });
+
+            group.TextSurfaceProviders.ForEach(provider =>
+            {
+                provider.AppendText(text, category, isHeader, runNumber);
+            });
+        }
+
+        /// <summary>
+        /// Writes diagnostic text to the programmable block's LCD screen
+        /// </summary>
+        /// <param name="text">Diagnostic text to display</param>
+        void WriteToDiagnosticOutput(string text, bool header = false)
+        {
+            thisPb.AppendText(text, header);
+        }
+    }
+}

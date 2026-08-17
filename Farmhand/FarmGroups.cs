@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Sandbox.ModAPI.Ingame;
@@ -21,8 +22,25 @@ namespace IngameScript
         public List<BroadcastController> BroadcastControllers { get; }
         public StateManager StateManager { get; }
         public FarmStats Stats { get; set; }
+
+        /// <summary>
+        /// Buffer the chunked scan steps accumulate into. Displays read Stats, so a scan
+        /// spread over several ticks never exposes a half-built snapshot.
+        /// </summary>
+        public FarmStats ScratchStats { get; set; }
         public ProgrammableBlock ProgrammableBlock { get; set; }
         public int RunNumber { get; set; }
+
+        // Persistent EntityId to wrapper indexes. Wrappers must survive between cycles so the
+        // per-cycle caches on Block and FarmPlot are not thrown away with them.
+        public readonly Dictionary<long, FarmPlot> FarmPlotsById = new Dictionary<long, FarmPlot>();
+        public readonly Dictionary<long, IrrigationSystem> IrrigationSystemsById =
+            new Dictionary<long, IrrigationSystem>();
+        public readonly Dictionary<long, WaterTank> WaterTanksById =
+            new Dictionary<long, WaterTank>();
+        public readonly Dictionary<long, AirVent> AirVentsById = new Dictionary<long, AirVent>();
+        public readonly Dictionary<long, SolarFoodGenerator> SolarFoodGeneratorsById =
+            new Dictionary<long, SolarFoodGenerator>();
 
         /// <summary>
         /// Initializes a new farm group with the specified name
@@ -41,6 +59,7 @@ namespace IngameScript
             BroadcastControllers = new List<BroadcastController>();
             StateManager = new StateManager();
             Stats = new FarmStats();
+            ScratchStats = new FarmStats();
         }
     }
 
@@ -52,6 +71,14 @@ namespace IngameScript
         readonly Dictionary<string, FarmGroup> groups = new Dictionary<string, FarmGroup>();
         readonly IMyGridTerminalSystem gridTerminalSystem;
         readonly Program program;
+
+        // Scratch buffers hoisted to fields so discovery does not allocate a fresh list per call.
+        // Each is fully consumed by Reconcile before the next Find* method reuses it.
+        readonly List<long> _staleIds = new List<long>();
+        readonly List<IMyFunctionalBlock> _scratchFunctional = new List<IMyFunctionalBlock>();
+        readonly List<IMyGasGenerator> _scratchGasGenerator = new List<IMyGasGenerator>();
+        readonly List<IMyGasTank> _scratchGasTank = new List<IMyGasTank>();
+        readonly List<IMyAirVent> _scratchAirVent = new List<IMyAirVent>();
 
         /// <summary>
         /// Initializes a new farm groups manager
@@ -105,6 +132,67 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Reconciles a wrapper list against the current block set, reusing existing wrapper
+        /// instances by EntityId. Wrapper persistence is required for the per-cycle caches on
+        /// Block and FarmPlot to survive between cycles.
+        /// </summary>
+        /// <param name="found">Blocks discovered this pass.</param>
+        /// <param name="existing">Wrapper list to rebuild in place.</param>
+        /// <param name="byId">Persistent EntityId to wrapper index for this list.</param>
+        /// <param name="create">Factory for wrappers not yet seen.</param>
+        void Reconcile<TBlock, TWrapper>(
+            List<TBlock> found,
+            List<TWrapper> existing,
+            Dictionary<long, TWrapper> byId,
+            Func<TBlock, TWrapper> create
+        )
+            where TBlock : class, IMyTerminalBlock
+            where TWrapper : Block
+        {
+            existing.Clear();
+            for (int i = 0; i < found.Count; i++)
+            {
+                TBlock block = found[i];
+                long id = block.EntityId;
+                TWrapper wrapper;
+                if (!byId.TryGetValue(id, out wrapper))
+                {
+                    wrapper = create(block);
+                    byId[id] = wrapper;
+                }
+                else
+                {
+                    // Reused wrapper: refresh its INI template so a key the player deleted
+                    // is restored. Wrapper constructors call UpdateCustomData, so before
+                    // wrappers persisted this happened every cycle as a side effect of
+                    // rebuilding them. Doing it here keeps that self-healing at discovery
+                    // cadence instead of losing it entirely.
+                    wrapper.UpdateCustomData();
+                }
+                existing.Add(wrapper);
+            }
+
+            // Evict wrappers whose blocks have left the grid, so the index does not grow
+            // without bound. IsPresent, not IsFunctional: a disabled block is still present
+            // and must keep its cached parse.
+            if (byId.Count != existing.Count)
+            {
+                _staleIds.Clear();
+                foreach (KeyValuePair<long, TWrapper> entry in byId)
+                {
+                    if (!entry.Value.IsPresent())
+                    {
+                        _staleIds.Add(entry.Key);
+                    }
+                }
+                for (int i = 0; i < _staleIds.Count; i++)
+                {
+                    byId.Remove(_staleIds[i]);
+                }
+            }
+        }
+
+        /// <summary>
         /// Discovers and registers farm plots for the specified group
         /// </summary>
         /// <param name="groupName">Name of the farm group</param>
@@ -112,12 +200,21 @@ namespace IngameScript
         {
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+            if (blockGroup == null)
+            {
+                group.FarmPlots.Clear();
+                return;
+            }
 
-            group.FarmPlots.Clear();
+            _scratchFunctional.Clear();
+            blockGroup.GetBlocksOfType(_scratchFunctional, block => FarmPlot.BlockIsValid(block));
 
-            List<IMyFunctionalBlock> validFarmPlots = new List<IMyFunctionalBlock>();
-            blockGroup?.GetBlocksOfType(validFarmPlots, block => FarmPlot.BlockIsValid(block));
-            validFarmPlots.ForEach(block => group.FarmPlots.Add(new FarmPlot(block, program)));
+            Reconcile(
+                _scratchFunctional,
+                group.FarmPlots,
+                group.FarmPlotsById,
+                block => new FarmPlot(block, program)
+            );
         }
 
         /// <summary>
@@ -128,16 +225,23 @@ namespace IngameScript
         {
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+            if (blockGroup == null)
+            {
+                group.IrrigationSystems.Clear();
+                return;
+            }
 
-            group.IrrigationSystems.Clear();
-
-            List<IMyGasGenerator> validIrrigationSystems = new List<IMyGasGenerator>();
-            blockGroup?.GetBlocksOfType(
-                validIrrigationSystems,
+            _scratchGasGenerator.Clear();
+            blockGroup.GetBlocksOfType(
+                _scratchGasGenerator,
                 block => IrrigationSystem.BlockIsValid(block)
             );
-            validIrrigationSystems.ForEach(block =>
-                group.IrrigationSystems.Add(new IrrigationSystem(block, program))
+
+            Reconcile(
+                _scratchGasGenerator,
+                group.IrrigationSystems,
+                group.IrrigationSystemsById,
+                block => new IrrigationSystem(block, program)
             );
         }
 
@@ -149,12 +253,21 @@ namespace IngameScript
         {
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+            if (blockGroup == null)
+            {
+                group.WaterTanks.Clear();
+                return;
+            }
 
-            group.WaterTanks.Clear();
+            _scratchGasTank.Clear();
+            blockGroup.GetBlocksOfType(_scratchGasTank, block => WaterTank.BlockIsValid(block));
 
-            List<IMyGasTank> validWaterTanks = new List<IMyGasTank>();
-            blockGroup?.GetBlocksOfType(validWaterTanks, block => WaterTank.BlockIsValid(block));
-            validWaterTanks.ForEach(block => group.WaterTanks.Add(new WaterTank(block, program)));
+            Reconcile(
+                _scratchGasTank,
+                group.WaterTanks,
+                group.WaterTanksById,
+                block => new WaterTank(block, program)
+            );
         }
 
         /// <summary>
@@ -165,12 +278,21 @@ namespace IngameScript
         {
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+            if (blockGroup == null)
+            {
+                group.AirVents.Clear();
+                return;
+            }
 
-            group.AirVents.Clear();
+            _scratchAirVent.Clear();
+            blockGroup.GetBlocksOfType(_scratchAirVent, block => AirVent.BlockIsValid(block));
 
-            List<IMyAirVent> validAirVents = new List<IMyAirVent>();
-            blockGroup?.GetBlocksOfType(validAirVents, block => AirVent.BlockIsValid(block));
-            validAirVents.ForEach(block => group.AirVents.Add(new AirVent(block, program)));
+            Reconcile(
+                _scratchAirVent,
+                group.AirVents,
+                group.AirVentsById,
+                block => new AirVent(block, program)
+            );
         }
 
         /// <summary>
@@ -181,16 +303,23 @@ namespace IngameScript
         {
             var group = GetGroup(groupName);
             IMyBlockGroup blockGroup = gridTerminalSystem.GetBlockGroupWithName(groupName);
+            if (blockGroup == null)
+            {
+                group.SolarFoodGenerators.Clear();
+                return;
+            }
 
-            group.SolarFoodGenerators.Clear();
-
-            List<IMyFunctionalBlock> validSolarFoodGenerators = new List<IMyFunctionalBlock>();
-            blockGroup?.GetBlocksOfType(
-                validSolarFoodGenerators,
+            _scratchFunctional.Clear();
+            blockGroup.GetBlocksOfType(
+                _scratchFunctional,
                 block => SolarFoodGenerator.BlockIsValid(block)
             );
-            validSolarFoodGenerators.ForEach(block =>
-                group.SolarFoodGenerators.Add(new SolarFoodGenerator(block, program))
+
+            Reconcile(
+                _scratchFunctional,
+                group.SolarFoodGenerators,
+                group.SolarFoodGeneratorsById,
+                block => new SolarFoodGenerator(block, program)
             );
         }
 
@@ -256,14 +385,16 @@ namespace IngameScript
                 )
             );
         }
-
         /// <summary>
-        /// Gets all registered farm groups
+        /// Returns the live group collection. Callers must not modify the collection while
+        /// enumerating it, and must not suspend mid-enumeration: pipeline steps that yield
+        /// walk Program's per-cycle group snapshot instead, refreshed in StepRoot(). Returning
+        /// the values view avoids a list allocation on every call.
         /// </summary>
-        /// <returns>List of all farm groups</returns>
-        public List<FarmGroup> GetAllGroups()
+
+        public IEnumerable<FarmGroup> GetAllGroups()
         {
-            return groups.Values.ToList();
+            return groups.Values;
         }
 
         public int GroupCount => groups.Count;

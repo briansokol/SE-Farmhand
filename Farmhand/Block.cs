@@ -26,9 +26,21 @@ namespace IngameScript
     /// </summary>
     internal abstract class Block
     {
+        /// <summary>
+        /// Identifies the current cycle for every per-block cache, published once per cycle
+        /// by Program. Static because Block holds its host as MyGridProgram, and a
+        /// programmable block script has exactly one Program instance.
+        ///
+        /// This is a tag, not a count: it wraps, so it is only ever valid to compare two of
+        /// these for equality. Subtracting them or comparing them for ordering is a bug.
+        /// </summary>
+        internal static int CycleTag;
+
         protected readonly MyIni _customData = new MyIni();
         protected readonly string _customDataHeader = "Farmhand";
         protected readonly MyGridProgram _program;
+        int _checkedTag = -1;
+        string _lastRaw;
 
         // Abstract properties that must be implemented by derived classes
         public abstract IMyTerminalBlock BlockInstance { get; }
@@ -49,6 +61,17 @@ namespace IngameScript
                     !(BlockInstance is IMyFunctionalBlock)
                     || (BlockInstance as IMyFunctionalBlock).Enabled
                 );
+        }
+
+        /// <summary>
+        /// True when the underlying block still exists on the grid, regardless of whether it
+        /// is switched on. Distinct from IsFunctional(), which also requires Enabled, and is
+        /// therefore wrong for cache invalidation: a player switching a block off must not
+        /// discard its wrapper or trigger a rediscovery.
+        /// </summary>
+        public bool IsPresent()
+        {
+            return BlockInstance != null && !BlockInstance.Closed;
         }
 
         /// <summary>
@@ -79,7 +102,7 @@ namespace IngameScript
         /// <summary>
         /// Updates the block's custom data with current configuration values
         /// </summary>
-        protected void UpdateCustomData()
+        internal void UpdateCustomData()
         {
             if (CustomDataConfigs != null && CustomDataConfigs.Count > 0 && IsFunctional())
             {
@@ -106,24 +129,47 @@ namespace IngameScript
                     _customDataHeader,
                     "; For more detailed explanations of options, see the official guide on Steam"
                 );
-                BlockInstance.CustomData = _customData.ToString();
+                string rendered = _customData.ToString();
+                if (rendered != BlockInstance.CustomData)
+                {
+                    BlockInstance.CustomData = rendered;
+                }
+                // Record what we just wrote (or confirmed) so the next cycle does not mistake
+                // our own write for an external edit and re-parse needlessly.
+                _lastRaw = rendered;
             }
         }
 
         /// <summary>
-        /// Parses custom data from the block's CustomData property into the internal INI structure
+        /// Ensures the parsed INI view matches the block's CustomData.
+        /// Reads the raw string at most once per cycle and re-parses only when it actually
+        /// changed, so repeated getter calls within a cycle cost one integer comparison.
         /// </summary>
         public void ParseCustomData()
         {
-            if (CustomDataConfigs != null && CustomDataConfigs.Count > 0 && IsFunctional())
+            if (CustomDataConfigs == null || CustomDataConfigs.Count == 0 || !IsFunctional())
             {
-                MyIniParseResult result;
-                if (!_customData.TryParse(BlockInstance.CustomData, out result))
-                {
-                    _program.Echo($"Cannot Parse Custom Data in: {BlockInstance.CustomName}");
-                    // throw new Exception(result.ToString());
-                }
+                return;
             }
+
+            if (_checkedTag == CycleTag)
+            {
+                return;
+            }
+            _checkedTag = CycleTag;
+
+            string raw = BlockInstance.CustomData;
+            if (raw == _lastRaw)
+            {
+                return;
+            }
+
+            MyIniParseResult result;
+            if (!_customData.TryParse(raw, out result))
+            {
+                _program.Echo($"Cannot Parse Custom Data in: {BlockInstance.CustomName}");
+            }
+            _lastRaw = raw;
         }
 
         /// <summary>

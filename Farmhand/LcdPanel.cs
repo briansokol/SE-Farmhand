@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
@@ -15,7 +16,7 @@ namespace IngameScript
         private FarmGroup _farmGroup;
 
         // Used to force redraw of sprites on server clients
-        private readonly bool _shiftSprites;
+        private bool _shiftSprites;
 
         private readonly Dictionary<string, CustomDataConfig> _customDataConfigs = new Dictionary<
             string,
@@ -108,6 +109,16 @@ namespace IngameScript
         }
 
         /// <summary>
+        /// Updates the per-cycle sprite shift flag. Set every cycle by Program rather than
+        /// at construction, because wrappers now persist across cycles and a frozen flag
+        /// stops multiplayer clients from redrawing.
+        /// </summary>
+        internal void SetShiftSprites(bool value)
+        {
+            _shiftSprites = value;
+        }
+
+        /// <summary>
         /// Gets the group name from custom data
         /// </summary>
         /// <returns>The configured group name</returns>
@@ -126,7 +137,11 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Writes text to the internal buffer if the category is set to be visible
+        /// Writes text to the internal buffer if the category is set to be visible.
+        /// Graphical panels are skipped entirely: nothing ever flushes their text buffer
+        /// (FlushTextToScreen is only called for non-graphical panels), so appending here
+        /// would grow the buffer without bound now that wrappers persist across cycles.
+        /// Skipping also avoids the per-message INI reads this method would otherwise do.
         /// </summary>
         /// <param name="text">Text to display</param>
         /// <param name="category">The category of the text</param>
@@ -139,7 +154,7 @@ namespace IngameScript
             int runNumber = 0
         )
         {
-            if (IsFunctional() && _lcdPanel != null)
+            if (IsFunctional() && _lcdPanel != null && !IsGraphicalMode())
             {
                 if (category == null || IsCategoryVisible(category))
                 {
@@ -251,6 +266,43 @@ namespace IngameScript
             {
                 var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle(), _shiftSprites);
                 renderer.DrawGraphicalUI();
+            }
+        }
+
+        /// <summary>
+        /// Appends this panel's sprites to the supplied buffer without opening a draw frame,
+        /// so the expensive layout work can be spread across ticks.
+        /// </summary>
+        public IEnumerator BuildSprites(List<MySprite> target, bool shiftSprites)
+        {
+            if (!IsFunctional() || _lcdPanel == null || !IsGraphicalMode()) yield break;
+
+            var renderer = new SpriteRenderer(_lcdPanel, _farmGroup, GetTitle(), shiftSprites);
+            renderer.PrepareSurface();
+            IEnumerator build = renderer.BuildSprites(target);
+            while (build.MoveNext())
+            {
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// Draws a pre-built sprite list in a single frame. Building happens across earlier
+        /// ticks; only this cheap flush needs to happen inside the frame's lifetime.
+        /// An empty buffer means the renderer chose not to draw, so leave the surface alone
+        /// rather than opening a frame that would blank it.
+        /// </summary>
+        public void FlushSprites(List<MySprite> sprites)
+        {
+            if (!IsFunctional() || _lcdPanel == null || !IsGraphicalMode()) return;
+            if (sprites.Count == 0) return;
+
+            using (var frame = _lcdPanel.DrawFrame())
+            {
+                for (int i = 0; i < sprites.Count; i++)
+                {
+                    frame.Add(sprites[i]);
+                }
             }
         }
 

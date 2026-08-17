@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Sandbox.ModAPI.Ingame;
@@ -68,6 +69,15 @@ namespace IngameScript
         // Cached layout to avoid recalculation when plot list hasn't changed
         private List<LayoutRow> _cachedLayoutRows;
         private int _cachedPlotCount = -1;
+
+        /// <summary>
+        /// Plots drawn between chunk boundaries, matching ScanChunkSize in Program.Scan.cs so
+        /// the two per-plot loops in the pipeline cost about the same per chunk.
+        /// </summary>
+        private const int PlotsPerChunk = 20;
+
+        // Reusable sprite buffer for DrawGraphicalUI, so that path allocates nothing per render
+        private readonly List<MySprite> _spriteBuffer = new List<MySprite>();
 
         /// <summary>
         /// Initializes a new SpriteRenderer for the specified surface and farm group
@@ -227,78 +237,126 @@ namespace IngameScript
         /// </summary>
         public void DrawGraphicalUI()
         {
+            PrepareSurface();
+            _spriteBuffer.Clear();
+            // Drains the builder in one call. This path is reached from TextSurfaceProvider,
+            // which has no pipeline step of its own to spread the work across, so its
+            // graphical screens still build as a single unyielded unit.
+            IEnumerator build = BuildSprites(_spriteBuffer);
+            while (build.MoveNext()) { }
+            if (_spriteBuffer.Count == 0) return;
+
+            using (var frame = _surface.DrawFrame())
+            {
+                for (int i = 0; i < _spriteBuffer.Count; i++)
+                {
+                    frame.Add(_spriteBuffer[i]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Prepares the surface for script rendering. Must run even for unsupported screens,
+        /// matching the original DrawGraphicalUI which set these before its unsupported check.
+        /// </summary>
+        public void PrepareSurface()
+        {
             _surface.ContentType = ContentType.SCRIPT;
             _surface.Script = string.Empty;
+        }
 
-            // Check if screen size is unsupported
+        /// <summary>
+        /// Accumulates this panel's sprites into a buffer without touching the surface, so the
+        /// expensive layout work can be spread across ticks. The parameter is named frame
+        /// because the helpers it delegates to were written against a draw frame; it is an
+        /// ordinary list here.
+        /// </summary>
+        public IEnumerator BuildSprites(List<MySprite> frame)
+        {
             if (!_isScreenSizeSupported)
             {
-                using (var frame = _surface.DrawFrame())
-                {
-                    DrawUnsupportedScreenMessage(frame);
-                }
-                return;
+                DrawUnsupportedScreenMessage(frame);
+                yield break;
             }
 
             if (_farmGroup == null || _farmGroup.FarmPlots.Count == 0)
             {
-                return;
+                yield break;
             }
 
-            using (var frame = _surface.DrawFrame())
+            // Shift sprite array every other render to force redraw on server clients
+            if (_shiftSprites)
             {
-                // Shift sprite array every other render to force redraw on server clients
-                if (_shiftSprites)
-                {
-                    frame.Add(new MySprite());
-                }
-
-                // Draw header and footer
-                DrawHeader(frame);
-
-                // Get or compute layout rows (cached when plot count hasn't changed)
-                var layoutRows = GetOrComputeLayoutRows();
-
-                // Start just below the header (with double spacing)
-                float currentY = RectHeight / 2 + _headerFontHeight + _spacing * 4;
-
-                // Draw each layout row
-                foreach (var layoutRow in layoutRows)
-                {
-                    int maxRowsInThisLayoutRow = 0;
-
-                    // Process left column (always present)
-                    if (layoutRow.LeftGroup != null)
-                    {
-                        int rowsInLeftGroup = DrawColumn(
-                            frame,
-                            layoutRow.LeftGroup,
-                            _leftMargin,
-                            currentY
-                        );
-                        maxRowsInThisLayoutRow = rowsInLeftGroup;
-                    }
-
-                    // Process right column (if present)
-                    if (layoutRow.RightGroup != null)
-                    {
-                        int rowsInRightGroup = DrawColumn(
-                            frame,
-                            layoutRow.RightGroup,
-                            _viewport.Width / 2f + _leftMargin,
-                            currentY
-                        );
-                        if (rowsInRightGroup > maxRowsInThisLayoutRow)
-                        {
-                            maxRowsInThisLayoutRow = rowsInRightGroup;
-                        }
-                    }
-
-                    // Move to next layout row (based on tallest group in this row, with double spacing)
-                    currentY +=
-                        maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing * 2;
-                }
+                frame.Add(new MySprite());
             }
+
+            // Draw header and footer
+            DrawHeader(frame);
+
+            // Get or compute layout rows (cached when plot count hasn't changed)
+            var layoutRows = GetOrComputeLayoutRows();
+
+            // Start just below the header (with double spacing)
+            float currentY = RectHeight / 2 + _headerFontHeight + _spacing * 4;
+
+            // Draw each layout row. Indexed rather than foreach, matching how _groupSnapshot is
+            // walked in the pipeline steps: an enumerator suspended across ticks throws if its
+            // list is mutated. GetOrComputeLayoutRows returns a freshly built list today, so
+            // foreach would also be safe, but the idiom is what keeps that from mattering.
+            for (int r = 0; r < layoutRows.Count; r++)
+            {
+                LayoutRow layoutRow = layoutRows[r];
+                int maxRowsInThisLayoutRow = 0;
+
+                // Process left column (always present)
+                if (layoutRow.LeftGroup != null)
+                {
+                    List<FarmPlot> leftPlots = layoutRow.LeftGroup.ToList();
+                    maxRowsInThisLayoutRow = RowsForColumn(leftPlots.Count);
+                    IEnumerator left = DrawColumn(frame, leftPlots, _leftMargin, currentY);
+                    while (left.MoveNext())
+                    {
+                        yield return null;
+                    }
+                }
+
+                // Process right column (if present)
+                if (layoutRow.RightGroup != null)
+                {
+                    List<FarmPlot> rightPlots = layoutRow.RightGroup.ToList();
+                    int rowsInRightGroup = RowsForColumn(rightPlots.Count);
+                    if (rowsInRightGroup > maxRowsInThisLayoutRow)
+                    {
+                        maxRowsInThisLayoutRow = rowsInRightGroup;
+                    }
+                    IEnumerator right = DrawColumn(
+                        frame,
+                        rightPlots,
+                        _viewport.Width / 2f + _leftMargin,
+                        currentY
+                    );
+                    while (right.MoveNext())
+                    {
+                        yield return null;
+                    }
+                }
+
+                // Move to next layout row (based on tallest group in this row, with double spacing)
+                currentY +=
+                    maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing * 2;
+
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// Rows a column of the given plot count occupies. A pure function of the count, which
+        /// is why DrawColumn no longer returns it: an iterator cannot return a value, and the
+        /// caller needs this before the column has finished drawing.
+        /// </summary>
+        private int RowsForColumn(int plotCount)
+        {
+            return (plotCount + _plotsPerRow - 1) / _plotsPerRow;
         }
 
         /// <summary>
@@ -402,23 +460,21 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Draws a column of farm plots with an optional group icon
+        /// Draws a column of farm plots with an optional group icon, yielding every
+        /// PlotsPerChunk plots so a large single-plant group does not become one
+        /// uninterruptible chunk. Use RowsForColumn for the row count.
         /// </summary>
         /// <param name="frame">The sprite frame to add sprites to</param>
-        /// <param name="group">The group of plots to draw</param>
+        /// <param name="plots">The plots to draw, already materialised by the caller</param>
         /// <param name="columnStartX">X position where the column starts</param>
         /// <param name="currentY">Y position where the column starts</param>
-        /// <returns>Number of rows used by this column</returns>
-        private int DrawColumn(
-            MySpriteDrawFrame frame,
-            IGrouping<string, FarmPlot> group,
+        private IEnumerator DrawColumn(
+            List<MySprite> frame,
+            List<FarmPlot> plots,
             float columnStartX,
             float currentY
         )
         {
-            string plantType = group.Key;
-            var plots = group.ToList();
-
             // Draw group icon
             DrawGroupIcon(frame, columnStartX, currentY, plots);
 
@@ -444,17 +500,19 @@ namespace IngameScript
                 );
 
                 DrawFarmPlot(frame, x, y, plot, renderState);
-            }
 
-            // Return number of rows used
-            return (plots.Count + _plotsPerRow - 1) / _plotsPerRow;
+                if ((i + 1) % PlotsPerChunk == 0)
+                {
+                    yield return null;
+                }
+            }
         }
 
         /// <summary>
         /// Draws the header sprite at the top of the screen
         /// </summary>
         /// <param name="frame">The sprite frame to add the header to</param>
-        private void DrawHeader(MySpriteDrawFrame frame)
+        private void DrawHeader(List<MySprite> frame)
         {
             var headerTitle = string.IsNullOrEmpty(_customTitle) ? "Farmhand" : _customTitle;
             string headerText = RenderHelpers.GetHeaderAnimation(
@@ -484,7 +542,7 @@ namespace IngameScript
         /// <param name="currentY">Y position for the icon</param>
         /// <param name="plots">List of plots in the group</param>
         private void DrawGroupIcon(
-            MySpriteDrawFrame frame,
+            List<MySprite> frame,
             float columnStartX,
             float currentY,
             List<FarmPlot> plots
@@ -537,7 +595,7 @@ namespace IngameScript
         /// <param name="plot">The farm plot to draw</param>
         /// <param name="renderState">Pre-calculated rendering state with colors and growth progress</param>
         private void DrawFarmPlot(
-            MySpriteDrawFrame frame,
+            List<MySprite> frame,
             float x,
             float y,
             FarmPlot plot,
@@ -647,7 +705,7 @@ namespace IngameScript
         /// Draws the footer sprite with dimensions at the bottom of the screen
         /// </summary>
         /// <param name="frame">The sprite frame to add the footer to</param>
-        private void DrawFooter(MySpriteDrawFrame frame)
+        private void DrawFooter(List<MySprite> frame)
         {
             string dimensionsText = $"{(int)_viewport.Width} x {(int)_viewport.Height}";
             frame.Add(
@@ -671,7 +729,7 @@ namespace IngameScript
         /// Draws an unsupported screen size message in the center of the screen
         /// </summary>
         /// <param name="frame">The sprite frame to add the message to</param>
-        private void DrawUnsupportedScreenMessage(MySpriteDrawFrame frame)
+        private void DrawUnsupportedScreenMessage(List<MySprite> frame)
         {
             frame.Add(
                 new MySprite()

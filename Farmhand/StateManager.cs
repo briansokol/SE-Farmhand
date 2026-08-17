@@ -71,40 +71,35 @@ namespace IngameScript
         /// <param name="currentValue">The current value of the state</param>
         public void UpdateState(string stateName, bool currentValue)
         {
-            bool previousValue = _previousStates.ContainsKey(stateName)
-                ? _previousStates[stateName]
-                : currentValue;
+            bool changed = HasStateChanged(stateName, currentValue);
 
-            // Only process if the state has changed
-            if (previousValue != currentValue)
+            // Record the value whether or not it changed.
+            _previousStates[stateName] = currentValue;
+
+            if (!changed)
             {
-                _previousStates[stateName] = currentValue;
-
-                // Determine which event to trigger based on the state change
-                string eventToTrigger = GetEventName(stateName, currentValue);
-
-                // Trigger all registered timers for this event
-                foreach (Timer timer in _timers)
-                {
-                    timer.Trigger(eventToTrigger);
-                }
-
-                // Trigger all registered action relays for this event
-                foreach (ActionRelay actionRelay in _actionRelays)
-                {
-                    actionRelay.Trigger(eventToTrigger);
-                }
-
-                // Trigger all registered broadcast controllers for this event
-                foreach (BroadcastController broadcastController in _broadcastControllers)
-                {
-                    broadcastController.Trigger(eventToTrigger);
-                }
+                return;
             }
-            else
+
+            // Determine which event to trigger based on the state change
+            string eventToTrigger = GetEventName(stateName, currentValue);
+
+            // Trigger all registered timers for this event
+            foreach (Timer timer in _timers)
             {
-                // Update the stored state even if it hasn't changed
-                _previousStates[stateName] = currentValue;
+                timer.Trigger(eventToTrigger);
+            }
+
+            // Trigger all registered action relays for this event
+            foreach (ActionRelay actionRelay in _actionRelays)
+            {
+                actionRelay.Trigger(eventToTrigger);
+            }
+
+            // Trigger all registered broadcast controllers for this event
+            foreach (BroadcastController broadcastController in _broadcastControllers)
+            {
+                broadcastController.Trigger(eventToTrigger);
             }
         }
 
@@ -120,16 +115,22 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Checks if a state has changed since the last update
+        /// True when the given value differs from the last recorded value for this state.
+        /// A state seen for the first time is not a change, which prevents an event storm
+        /// on script load or recompile.
         /// </summary>
         /// <param name="stateName">The name of the state to check</param>
         /// <param name="currentValue">The current value to compare against</param>
         /// <returns>True if the state has changed</returns>
         public bool HasStateChanged(string stateName, bool currentValue)
         {
-            bool previousValue = _previousStates.ContainsKey(stateName)
-                ? _previousStates[stateName]
-                : !currentValue;
+            bool previousValue;
+            if (!_previousStates.TryGetValue(stateName, out previousValue))
+            {
+                // A state seen for the first time is not a transition. This is what prevents
+                // every timer, relay and broadcast controller firing on script recompile.
+                return false;
+            }
             return previousValue != currentValue;
         }
 

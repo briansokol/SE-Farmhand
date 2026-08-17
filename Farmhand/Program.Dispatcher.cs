@@ -1,0 +1,207 @@
+using System;
+using System.Collections.Generic;
+
+namespace IngameScript
+{
+    public partial class Program
+    {
+        /// <summary>Why a pipeline step yielded back to the dispatcher.</summary>
+        public enum YieldReason
+        {
+            /// <summary>Per-run instruction budget was hit; resume next tick.</summary>
+            BudgetHit,
+
+            /// <summary>Logical chunk completed; resume next tick.</summary>
+            ChunkBoundary
+        }
+
+        /// <summary>
+        /// Highest value the cycle tag reaches before wrapping to zero. Nothing compares two
+        /// tags for ordering, only for equality, so wrapping is safe and keeps the tag from
+        /// growing without bound for the life of the session.
+        /// </summary>
+        const int CycleTagWrap = 999999;
+
+        /// <summary>Fraction of the per-run instruction allowance a single run may consume.</summary>
+        public float BudgetFraction = 0.8f;
+
+        /// <summary>Whether to show verbose pipeline detail on the programmable block screen.</summary>
+        public bool DebugLogging;
+
+        /// <summary>True while the pipeline is paused via the "pause" command.</summary>
+        bool _paused;
+
+        /// <summary>Index of the currently executing step.</summary>
+        int _stepIndex;
+
+        /// <summary>Human readable label of the currently executing step.</summary>
+        string _stepLabel = "init";
+
+        /// <summary>Ticks consumed by the cycle currently in progress.</summary>
+        public int TicksThisCycle { get; private set; }
+
+        /// <summary>Ticks consumed by the last completed cycle.</summary>
+        public int TicksLastCycle { get; private set; }
+
+        /// <summary>Highest instruction count observed during the current cycle.</summary>
+        public int InstructionHighWater { get; private set; }
+
+        static readonly string[] StepLabels =
+        {
+            "Discovery", "Config", "ScanPlots", "ScanSupport", "Commit",
+            "BuildText", "RenderText", "BuildSprites", "FlushSprites", "RenderPlotLCDs"
+        };
+
+        IEnumerator<YieldReason> _workIterator;
+
+        /// <summary>True when this run has consumed its share of the instruction allowance.</summary>
+        bool BudgetExceeded()
+        {
+            return Runtime.CurrentInstructionCount >
+                   Runtime.MaxInstructionCount * BudgetFraction;
+        }
+
+        /// <summary>
+        /// Pumps the work iterator repeatedly within a single tick until the budget trips
+        /// or the iterator finishes. Step faults are handled inside StepRoot; the catch here
+        /// is only a last-resort backstop for anything thrown outside a step.
+        /// </summary>
+        void RunOneTick()
+        {
+            TicksThisCycle++;
+            try
+            {
+                // The budget is checked after a chunk runs, never before, so a chunk cannot be
+                // interrupted once entered and the peak per run is the guard plus whichever
+                // chunk straddles it. Chunk costs were measured in game to size the yield
+                // points; see the design doc for the numbers.
+                do
+                {
+                    if (_workIterator == null || !_workIterator.MoveNext())
+                    {
+                        _workIterator = StepRoot();
+                        break;
+                    }
+                } while (!BudgetExceeded());
+            }
+            catch (Exception ex)
+            {
+                LogStepError(ex);
+                _workIterator = StepRoot();
+            }
+
+            if (Runtime.CurrentInstructionCount > InstructionHighWater)
+            {
+                InstructionHighWater = Runtime.CurrentInstructionCount;
+            }
+        }
+
+        /// <summary>Top level work loop iterating over each pipeline step indefinitely.</summary>
+        IEnumerator<YieldReason> StepRoot()
+        {
+            while (true)
+            {
+                // The cycle tag gates every cache in the script, so it must advance here at
+                // the top of each pass. StepRoot never terminates, which makes the
+                // !MoveNext() branch in RunOneTick purely defensive.
+                Block.CycleTag = Block.CycleTag >= CycleTagWrap ? 0 : Block.CycleTag + 1;
+                shiftSprites = !shiftSprites;
+                // The player can lower RescanIntervalCycles at runtime. Clamping first means
+                // a countdown started under a longer interval does not outlive the change,
+                // which is how the old "cycles since last discovery" subtraction behaved.
+                if (_cyclesUntilRescan > RescanIntervalCycles)
+                {
+                    _cyclesUntilRescan = RescanIntervalCycles;
+                }
+                if (_cyclesUntilRescan > 0)
+                {
+                    _cyclesUntilRescan--;
+                }
+                ApplyFrameState();
+                RefreshGroupSnapshot();
+                TicksLastCycle = TicksThisCycle;
+                TicksThisCycle = 0;
+                InstructionHighWater = 0;
+
+                // Named so the programmable block screen shows the preamble as itself rather
+                // than holding the label of whichever step happened to run last.
+                _stepLabel = "Preamble";
+                _stepIndex = -1;
+
+                // Split the preamble off from step 0. Without this, the wrap-around from the
+                // last step of the previous cycle runs the preamble AND all of
+                // StepDiscoveryIfDue's first section, including the full-grid
+                // FindFarmLCDBlocks, in one uninterruptible MoveNext on top of whatever the
+                // tick had already spent. That is the largest unyielded unit in the script.
+                yield return YieldReason.ChunkBoundary;
+
+                for (int i = 0; i < StepLabels.Length; i++)
+                {
+                    _stepIndex = i;
+                    _stepLabel = StepLabels[i];
+                    IEnumerator<YieldReason> step = StepFor(i);
+                    // Explicit MoveNext pump rather than foreach, so a faulting step can be
+                    // abandoned without abandoning the cycle. C# forbids yield inside a try
+                    // that has a catch, so only the MoveNext call sits inside the try.
+                    while (true)
+                    {
+                        bool moved;
+                        try
+                        {
+                            moved = step.MoveNext();
+                        }
+                        catch (Exception ex)
+                        {
+                            // Skip the rest of this step and continue the cycle, matching the
+                            // pre-2.0 handler. Restarting the whole pipeline here would mean a
+                            // reproducible fault in an early step permanently starves every
+                            // later step, freezing displays with no visible cause.
+                            LogStepError(ex);
+                            break;
+                        }
+                        if (!moved)
+                        {
+                            break;
+                        }
+                        yield return step.Current;
+                    }
+                    yield return YieldReason.ChunkBoundary;
+                }
+            }
+        }
+
+        /// <summary>Records a step fault on the programmable block screen.</summary>
+        void LogStepError(Exception ex)
+        {
+            Echo($"Error in step {_stepIndex} {_stepLabel}: {ex.Message}");
+        }
+
+        /// <summary>Returns the iterator for the step at the given index.</summary>
+        IEnumerator<YieldReason> StepFor(int i)
+        {
+            switch (i)
+            {
+                case 0: return StepDiscoveryIfDue();
+                case 1: return StepParseConfigIfDirty();
+                case 2: return StepScanPlots();
+                case 3: return StepScanSupport();
+                case 4: return StepCommitSnapshot();
+                case 5: return StepBuildTextOutput();
+                case 6: return StepRenderText();
+                case 7: return StepBuildGraphicalSprites();
+                case 8: return StepFlushGraphical();
+                case 9: return StepRenderPlotLCDs();
+                default: return NoOpStep();
+            }
+        }
+
+        /// <summary>
+        /// Defensive no-op iterator used when the step index drifts out of range, so an
+        /// off-by-one bug degrades to a wasted tick rather than an exception.
+        /// </summary>
+        IEnumerator<YieldReason> NoOpStep()
+        {
+            yield return YieldReason.ChunkBoundary;
+        }
+    }
+}

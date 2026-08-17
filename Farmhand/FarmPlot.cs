@@ -37,6 +37,41 @@ namespace IngameScript
         public string CauseOfDeath { get; set; } = string.Empty;
     }
 
+    /// <summary>Which configured colour a farm plot light should display.</summary>
+    public enum PlotLightRole
+    {
+        Empty,
+        Growing,
+        Ready,
+        Dead,
+        WaterLow
+    }
+
+    /// <summary>Plain inputs to the plot light decision, free of Space Engineers types.</summary>
+    public struct PlotLightInputs
+    {
+        public bool IsFunctional;
+        public bool IsPlanted;
+        public bool IsAlive;
+        public bool IsFullyGrown;
+
+        /// <summary>False when plot details could not be read, making CropHealth untrustworthy.</summary>
+        public bool HasDetails;
+
+        public float CropHealth;
+        public float WaterFilledRatio;
+        public float HealthLowThreshold;
+        public float WaterLowThreshold;
+    }
+
+    /// <summary>Resolved light appearance for a farm plot.</summary>
+    public struct PlotLightDecision
+    {
+        public PlotLightRole Role;
+        public float BlinkInterval;
+        public float BlinkLength;
+    }
+
     /// <summary>
     /// Manages agricultural plots with plant monitoring, lighting control, and harvest tracking
     /// </summary>
@@ -46,6 +81,8 @@ namespace IngameScript
         private readonly IMyFarmPlotLogic _farmPlotLogic;
         private readonly IMyLightingComponent _lightingComponent;
         private readonly IMyResourceStorageComponent _storageComponent;
+        private FarmPlotDetails _cachedDetails;
+        private int _detailsTag = -1;
 
         public override IMyTerminalBlock BlockInstance => _farmPlot;
         protected override Dictionary<string, CustomDataConfig> CustomDataConfigs => null;
@@ -162,25 +199,40 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Parses the detailed info string from the farm plot into structured data
+        /// Returns this plot's parsed detail values, computing them at most once per cycle.
+        /// The underlying engine call plus string parse is expensive and several renderers
+        /// request the same plot's details within a single cycle.
         /// </summary>
-        /// <returns>Parsed farm plot details, or null if parsing fails</returns>
         public FarmPlotDetails GetPlotDetails()
         {
-            if (_farmPlotLogic == null)
+            if (_detailsTag == Block.CycleTag)
             {
-                return null;
+                return _cachedDetails;
             }
 
-            string detailsText = _farmPlotLogic.GetDetailedInfoWithoutRequiredInput();
+            _detailsTag = Block.CycleTag;
+            _cachedDetails = _farmPlotLogic == null
+                ? null
+                : ParsePlotDetails(_farmPlotLogic.GetDetailedInfoWithoutRequiredInput());
+
+            return _cachedDetails;
+        }
+
+        /// <summary>
+        /// Parses a farm plot's detailed-info text into a details object.
+        /// Values are identified by format rather than by key name so that non-English
+        /// game clients parse correctly. Percentage values appear in a fixed order:
+        /// index 0 is growth progress, index 1 is crop health.
+        /// Returns null when the input is null, empty, or whitespace.
+        /// </summary>
+        public static FarmPlotDetails ParsePlotDetails(string detailsText)
+        {
             if (string.IsNullOrWhiteSpace(detailsText))
             {
                 return null;
             }
 
             var details = new FarmPlotDetails();
-            // Percentage values appear in order: [0] Growth Progress, [1] Crop Health
-            // Parsing by value format rather than key name to support non-English game languages
             var percentageValues = new List<float>();
             string[] lines = detailsText.Split('\n');
 
@@ -217,7 +269,7 @@ namespace IngameScript
 
                 if (value.EndsWith("%"))
                 {
-                    // Growth Progress or Crop Health — collected in order of appearance
+                    // Growth Progress or Crop Health, collected in order of appearance
                     string numStr = value.Substring(0, value.Length - 1).Trim();
                     float pct;
                     if (float.TryParse(numStr, System.Globalization.NumberStyles.Float,
@@ -239,7 +291,7 @@ namespace IngameScript
                         int spaceIndex = value.IndexOf(' ');
                         if (spaceIndex > 0)
                         {
-                            // Current Water Usage: "1.6 L/min" — parse the number before the unit
+                            // Current Water Usage: "1.6 L/min", parse the number before the unit
                             string numberPart = value.Substring(0, spaceIndex).Trim();
                             float waterUsage;
                             if (float.TryParse(numberPart, System.Globalization.NumberStyles.Float,
@@ -250,7 +302,7 @@ namespace IngameScript
                         }
                         else if (!string.IsNullOrEmpty(value))
                         {
-                            // Cause of Death: any remaining text value
+                            // Cause of Death: any remaining single-token text value
                             details.CauseOfDeath = value;
                         }
                     }
@@ -261,6 +313,68 @@ namespace IngameScript
             if (percentageValues.Count > 1) details.CropHealth = percentageValues[1];
 
             return details;
+        }
+
+        /// <summary>
+        /// Resolves the light role and blink settings for a plot.
+        /// Reproduces the original two-pass ordering: plant state selects a role first,
+        /// then water state can override both the role and the blink settings.
+        /// </summary>
+        public static PlotLightDecision DecidePlotLight(PlotLightInputs inputs)
+        {
+            PlotLightDecision decision;
+            decision.Role = PlotLightRole.Empty;
+            decision.BlinkInterval = 0f;
+            decision.BlinkLength = 1f;
+
+            bool isHealthLow = inputs.IsPlanted
+                && inputs.IsAlive
+                && inputs.HasDetails
+                && inputs.CropHealth < inputs.HealthLowThreshold;
+
+            bool isReady = inputs.IsPlanted && inputs.IsFullyGrown;
+
+            // Pass one: plant state selects the role.
+            if (inputs.IsPlanted)
+            {
+                if (!inputs.IsAlive)
+                {
+                    decision.Role = PlotLightRole.Dead;
+                }
+                else if (inputs.IsFullyGrown)
+                {
+                    // Ready to harvest wins even when health is low.
+                    decision.Role = PlotLightRole.Ready;
+                }
+                else if (isHealthLow)
+                {
+                    decision.Role = PlotLightRole.Dead;
+                    decision.BlinkInterval = 2f;
+                    decision.BlinkLength = 50f;
+                }
+                else
+                {
+                    decision.Role = PlotLightRole.Growing;
+                }
+            }
+
+            // Pass two: water state can override. A low-health plot keeps its blink.
+            if (inputs.IsFunctional
+                && inputs.WaterFilledRatio <= inputs.WaterLowThreshold
+                && !isHealthLow
+                && !isReady)
+            {
+                decision.Role = PlotLightRole.WaterLow;
+                decision.BlinkInterval = 2f;
+                decision.BlinkLength = 50f;
+            }
+            else if (!isHealthLow || isReady)
+            {
+                decision.BlinkInterval = 0f;
+                decision.BlinkLength = 1f;
+            }
+
+            return decision;
         }
 
         /// <summary>

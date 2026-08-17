@@ -117,6 +117,30 @@ namespace IngameScript
                     "Low health percent threshold, between 0.0 and 1.0 (default: 1.0)"
                 )
             },
+            {
+                "BudgetFraction",
+                new CustomDataConfig(
+                    "Budget Fraction",
+                    "0.8",
+                    "Fraction of the instruction allowance one run may use before yielding (0.1 to 0.95)"
+                )
+            },
+            {
+                "RescanIntervalCycles",
+                new CustomDataConfig(
+                    "Rescan Interval Cycles",
+                    "30",
+                    "Cycles between periodic block discovery rescans"
+                )
+            },
+            {
+                "DebugLogging",
+                new CustomDataConfig(
+                    "Debug Logging",
+                    "false",
+                    "Show verbose pipeline detail on the programmable block screen"
+                )
+            },
         };
 
         public override IMyTerminalBlock BlockInstance => _programmableBlock;
@@ -284,7 +308,8 @@ namespace IngameScript
                     .ToString(_customDataConfigs["IceLowThreshold"].DefaultValue);
 
                 float threshold;
-                if (float.TryParse(thresholdString, out threshold))
+                if (float.TryParse(thresholdString, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out threshold))
                 {
                     // Clamp between 0.0 and 1.0
                     return Math.Max(0.0f, Math.Min(1.0f, threshold));
@@ -307,7 +332,8 @@ namespace IngameScript
                     .ToString(_customDataConfigs["WaterTankLowThreshold"].DefaultValue);
 
                 float threshold;
-                if (float.TryParse(thresholdString, out threshold))
+                if (float.TryParse(thresholdString, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out threshold))
                 {
                     // Clamp between 0.0 and 1.0
                     return Math.Max(0.0f, Math.Min(1.0f, threshold));
@@ -330,7 +356,8 @@ namespace IngameScript
                     .ToString(_customDataConfigs["WaterLowThreshold"].DefaultValue);
 
                 float threshold;
-                if (float.TryParse(thresholdString, out threshold))
+                if (float.TryParse(thresholdString, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out threshold))
                 {
                     // Clamp between 0.0 and 1.0
                     return Math.Max(0.0f, Math.Min(1.0f, threshold));
@@ -353,7 +380,8 @@ namespace IngameScript
                     .ToString(_customDataConfigs["HealthLowThreshold"].DefaultValue);
 
                 float threshold;
-                if (float.TryParse(thresholdString, out threshold))
+                if (float.TryParse(thresholdString, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out threshold))
                 {
                     // Clamp between 0.0 and 1.0
                     return Math.Max(0.0f, Math.Min(1.0f, threshold));
@@ -369,6 +397,62 @@ namespace IngameScript
         public bool ControlFarmPlotLights
         {
             get { return GetCustomDataBool("ControlFarmPlotLights", true); }
+        }
+
+        /// <summary>
+        /// Fraction of the per-run instruction allowance a single run may consume before the
+        /// dispatcher yields. Clamped to a safe band: at or above 1.0 a run could overshoot
+        /// the allowance and kill the script, which is the exact failure this release exists
+        /// to prevent.
+        /// </summary>
+        public float BudgetFraction
+        {
+            get
+            {
+                ParseCustomData();
+                var raw = _customData
+                    .Get(_customDataHeader, _customDataConfigs["BudgetFraction"].Label)
+                    .ToString(_customDataConfigs["BudgetFraction"].DefaultValue);
+
+                float value;
+                // Invariant culture: on a comma-decimal locale "0.8" would otherwise parse
+                // as 8 and clamp to 0.95, silently running at a 95% budget.
+                if (float.TryParse(raw, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out value))
+                {
+                    return Math.Max(0.1f, Math.Min(0.95f, value));
+                }
+                return 0.8f;
+            }
+        }
+
+        /// <summary>Cycles between periodic block discovery rescans. Minimum 1.</summary>
+        public int RescanIntervalCycles
+        {
+            get
+            {
+                ParseCustomData();
+                var raw = _customData
+                    .Get(_customDataHeader, _customDataConfigs["RescanIntervalCycles"].Label)
+                    .ToString(_customDataConfigs["RescanIntervalCycles"].DefaultValue);
+
+                int value;
+                // Invariant culture for the same reason as BudgetFraction. Integer parsing
+                // only exposes the sign symbol to the locale, but matching the form keeps
+                // both dispatcher settings locale independent.
+                if (int.TryParse(raw, System.Globalization.NumberStyles.Integer,
+                        System.Globalization.CultureInfo.InvariantCulture, out value))
+                {
+                    return value < 1 ? 1 : value;
+                }
+                return 30;
+            }
+        }
+
+        /// <summary>Whether to show verbose pipeline detail on the programmable block screen.</summary>
+        public bool DebugLogging
+        {
+            get { return GetCustomDataBool("DebugLogging", false); }
         }
 
         /// <summary>
