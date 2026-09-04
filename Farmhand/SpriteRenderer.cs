@@ -684,30 +684,6 @@ namespace IngameScript
         }
 
         /// <summary>
-        /// Draws the footer sprite with dimensions at the bottom of the screen
-        /// </summary>
-        /// <param name="frame">The sprite frame to add the footer to</param>
-        private void DrawFooter(List<MySprite> frame)
-        {
-            string dimensionsText = $"{(int)_viewport.Width} x {(int)_viewport.Height}";
-            frame.Add(
-                new MySprite()
-                {
-                    Type = SpriteType.TEXT,
-                    Data = dimensionsText,
-                    Position = CreatePosition(
-                        _viewport.Width / 2f,
-                        _viewport.Height - _headerYPosition * 2f
-                    ),
-                    RotationOrScale = _headerTextScale,
-                    Color = _surface.ScriptForegroundColor,
-                    Alignment = TextAlignment.CENTER,
-                    FontId = "White",
-                }
-            );
-        }
-
-        /// <summary>
         /// Draws an unsupported screen size message in the center of the screen
         /// </summary>
         /// <param name="frame">The sprite frame to add the message to</param>
