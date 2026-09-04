@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,6 +60,7 @@ namespace IngameScript
         private readonly int _plotPadding;
         private readonly int _plotsPerRow;
         private readonly int _halfScreenPlots;
+        private readonly int _firstRowTop;
 
         // Computed property: Total rect height is growth + water
         private int RectHeight => _growthRectHeight + _waterRectHeight;
@@ -117,6 +119,10 @@ namespace IngameScript
             _headerFontHeight = layout.HeaderFontHeight;
             _headerTextScale = layout.HeaderTextScale;
             _headerYPosition = _headerFontHeight / 2;
+            // First tile row sits below the header with quadruple spacing, or at the top
+            // margin when the layout dropped the header
+            _firstRowTop =
+                _headerFontHeight > 0 ? _headerFontHeight + _spacing * 4 : _spacing;
             _iconSize = layout.IconSize;
             _leftMargin = layout.LeftMargin;
             _waterRectHeight = layout.WaterRectHeight;
@@ -142,83 +148,57 @@ namespace IngameScript
         /// <returns>Screen-specific layout with integer pixel values</returns>
         private static ScreenLayout GetLayoutForScreenSize(int width, int height)
         {
-            // 1024x512 - Wide LCD panel
-            if (width == 1024 && height == 512)
+            // Scale from width so 512-wide screens keep the hand-tuned sizes and 1024-wide
+            // screens are capped to them. The floor keeps a tile 12px wide with a 1px border
+            // and a 1px water fill. Every dimension is rounded once here; positions are then
+            // built by summing these integers, so every sprite edge lands on a pixel boundary.
+            float s = Math.Min(1f, Math.Max(0.4f, width / 512f));
+            var layout = new ScreenLayout
             {
-                return new ScreenLayout
-                {
-                    Spacing = 6,
-                    HeaderFontHeight = 30,
-                    HeaderTextScale = 1.0f,
-                    IconSize = 50,
-                    WaterRectHeight = 10,
-                    GrowthRectHeight = 40,
-                    RectWidth = 30,
-                    LeftMargin = 10,
-                    PlotPadding = 2,
-                    IsSupported = true,
-                };
-            }
-
-            // 512x512 - Square LCD panel
-            // 512x1024 - Rotated Wide LCD panel
-            // 512x362 - Sloped LCD panel
-            // 362x512 - Rotated Sloped LCD panel
-            if (
-                (width == 512 && height == 512)
-                || (width == 512 && height == 1024)
-                || (width == 512 && height == 362)
-                || (width == 362 && height == 512)
-            )
-            {
-                return new ScreenLayout
-                {
-                    Spacing = 6,
-                    HeaderFontHeight = 30,
-                    HeaderTextScale = 1.0f,
-                    IconSize = 50,
-                    WaterRectHeight = 10,
-                    GrowthRectHeight = 40,
-                    RectWidth = 30,
-                    LeftMargin = 10,
-                    PlotPadding = 2,
-                    IsSupported = true,
-                };
-            }
-
-            // 512x307 - Small LCD/Text panel
-            // 307x512 - Rotated Small LCD/Text panel
-            if ((width == 512 && height == 307) || (width == 307 && height == 512))
-            {
-                return new ScreenLayout
-                {
-                    Spacing = 3,
-                    HeaderFontHeight = 18,
-                    HeaderTextScale = 0.7f,
-                    IconSize = 42,
-                    WaterRectHeight = 8,
-                    GrowthRectHeight = 37,
-                    RectWidth = 30,
-                    LeftMargin = 6,
-                    PlotPadding = 2,
-                    IsSupported = true,
-                };
-            }
-
-            // Unsupported screen size - return minimal layout for error display
-            return new ScreenLayout
-            {
-                Spacing = 10,
-                HeaderFontHeight = 30,
-                HeaderTextScale = 1.0f,
-                IconSize = 0,
-                WaterRectHeight = 0,
-                GrowthRectHeight = 0,
-                RectWidth = 0,
-                LeftMargin = 0,
-                PlotPadding = 0,
-                IsSupported = false,
+                Spacing = Scale(6, s),
+                HeaderFontHeight = Scale(30, s),
+                HeaderTextScale = s,
+                IconSize = Scale(50, s),
+                WaterRectHeight = Scale(10, s),
+                GrowthRectHeight = Scale(40, s),
+                RectWidth = Scale(30, s),
+                LeftMargin = Scale(10, s),
+                PlotPadding = Math.Max(1, Scale(2, s)),
             };
+
+            // Vertical budget: drop the header when it and one tile row do not fit, then
+            // shorten the growth bar so a single row fits. A 512x73 corner LCD becomes one
+            // strip of 30x61 tiles this way.
+            int tileHeight = layout.GrowthRectHeight + layout.WaterRectHeight;
+            if (layout.HeaderFontHeight + layout.Spacing * 5 + tileHeight > height)
+            {
+                layout.HeaderFontHeight = 0;
+            }
+            int maxTileHeight = height - layout.Spacing * 2;
+            if (tileHeight > maxTileHeight)
+            {
+                layout.GrowthRectHeight = maxTileHeight - layout.WaterRectHeight;
+                tileHeight = maxTileHeight;
+            }
+            layout.IconSize = Math.Min(layout.IconSize, tileHeight);
+
+            // Supported when the growth fill can be at least 1px and one tile fits beside the icon
+            layout.IsSupported =
+                layout.GrowthRectHeight >= layout.PlotPadding * 4 + 1
+                && width
+                    >= layout.LeftMargin
+                        + layout.IconSize
+                        + layout.Spacing * 2
+                        + layout.RectWidth;
+            return layout;
+        }
+
+        /// <summary>
+        /// Scales a 512-wide reference dimension and rounds it to a whole pixel
+        /// </summary>
+        private static int Scale(int reference, float s)
+        {
+            return (int)Math.Round(reference * s);
         }
 
         /// <summary>
@@ -296,8 +276,7 @@ namespace IngameScript
             // Get or compute layout rows (cached when plot count hasn't changed)
             var layoutRows = GetOrComputeLayoutRows();
 
-            // Start just below the header (with double spacing)
-            float currentY = RectHeight / 2 + _headerFontHeight + _spacing * 4;
+            int currentTop = _firstRowTop;
 
             // Draw each layout row. Indexed rather than foreach, matching how _groupSnapshot is
             // walked in the pipeline steps: an enumerator suspended across ticks throws if its
@@ -313,7 +292,7 @@ namespace IngameScript
                 {
                     List<FarmPlot> leftPlots = layoutRow.LeftGroup.ToList();
                     maxRowsInThisLayoutRow = RowsForColumn(leftPlots.Count);
-                    IEnumerator left = DrawColumn(frame, leftPlots, _leftMargin, currentY);
+                    IEnumerator left = DrawColumn(frame, leftPlots, _leftMargin, currentTop);
                     while (left.MoveNext())
                     {
                         yield return null;
@@ -332,8 +311,8 @@ namespace IngameScript
                     IEnumerator right = DrawColumn(
                         frame,
                         rightPlots,
-                        _viewport.Width / 2f + _leftMargin,
-                        currentY
+                        (int)_viewport.Width / 2 + _leftMargin,
+                        currentTop
                     );
                     while (right.MoveNext())
                     {
@@ -342,7 +321,7 @@ namespace IngameScript
                 }
 
                 // Move to next layout row (based on tallest group in this row, with double spacing)
-                currentY +=
+                currentTop +=
                     maxRowsInThisLayoutRow * (_growthRectHeight + _spacing * 2) + _spacing * 2;
 
                 yield return null;
@@ -471,27 +450,26 @@ namespace IngameScript
         private IEnumerator DrawColumn(
             List<MySprite> frame,
             List<FarmPlot> plots,
-            float columnStartX,
-            float currentY
+            int columnLeft,
+            int rowTop
         )
         {
             // Draw group icon
-            DrawGroupIcon(frame, columnStartX, currentY, plots);
+            DrawGroupIcon(frame, columnLeft, rowTop, plots);
 
             // Calculate if this is an alternate frame for blinking (odd frames: 1, 3, 5)
             bool isAlternateFrame = (_farmGroup.RunNumber % 2) == 1;
 
             // Draw plots in the group
+            int plotLeft = columnLeft + _iconSize + _spacing;
             for (int i = 0; i < plots.Count; i++)
             {
                 var plot = plots[i];
                 int row = i / _plotsPerRow;
                 int col = i % _plotsPerRow;
 
-                // Calculate position (offset by icon)
-                float plotStartX = columnStartX + _iconSize + _spacing;
-                float x = plotStartX + col * (_rectWidth + _spacing) + _rectWidth / 2;
-                float y = currentY + row * (RectHeight + _spacing * 2);
+                int left = plotLeft + col * (_rectWidth + _spacing);
+                int top = rowTop + row * (RectHeight + _spacing * 2);
 
                 // Calculate all rendering state once for this plot
                 RenderHelpers.PlotRenderState renderState = CalculatePlotRenderState(
@@ -499,7 +477,7 @@ namespace IngameScript
                     isAlternateFrame
                 );
 
-                DrawFarmPlot(frame, x, y, plot, renderState);
+                DrawFarmPlot(frame, left, top, plot, renderState);
 
                 if ((i + 1) % PlotsPerChunk == 0)
                 {
@@ -514,6 +492,9 @@ namespace IngameScript
         /// <param name="frame">The sprite frame to add the header to</param>
         private void DrawHeader(List<MySprite> frame)
         {
+            // The layout drops the header on screens too short to fit it and a tile row
+            if (_headerFontHeight == 0) return;
+
             var headerTitle = string.IsNullOrEmpty(_customTitle) ? "Farmhand" : _customTitle;
             string headerText = RenderHelpers.GetHeaderAnimation(
                 _farmGroup?.RunNumber ?? 0,
@@ -543,15 +524,15 @@ namespace IngameScript
         /// <param name="plots">List of plots in the group</param>
         private void DrawGroupIcon(
             List<MySprite> frame,
-            float columnStartX,
-            float currentY,
+            int columnLeft,
+            int rowTop,
             List<FarmPlot> plots
         )
         {
             if (plots.Count > 0)
             {
-                float iconX = columnStartX + (_iconSize / 2);
-                float iconY = currentY;
+                // Icon is vertically centred on the first tile row
+                int iconTop = rowTop + (RectHeight - _iconSize) / 2;
 
                 if (plots[0].IsPlantPlanted)
                 {
@@ -563,7 +544,10 @@ namespace IngameScript
                                 plots[0].PlantId,
                                 _surface
                             ),
-                            Position = CreatePosition(iconX, iconY),
+                            Position = CreatePosition(
+                                columnLeft + _iconSize / 2f,
+                                iconTop + _iconSize / 2f
+                            ),
                             Size = new Vector2(_iconSize, _iconSize),
                             Alignment = TextAlignment.CENTER,
                         }
@@ -571,16 +555,16 @@ namespace IngameScript
                 }
                 else
                 {
-                    frame.Add(
-                        new MySprite()
-                        {
-                            Type = SpriteType.TEXTURE,
-                            Data = "Circle",
-                            Position = CreatePosition(iconX + 1, iconY),
-                            Size = new Vector2(_iconSize * 1 / 3, _iconSize * 1 / 3),
-                            Color = _farmGroup.ProgrammableBlock.PlanterEmptyColor,
-                            Alignment = TextAlignment.CENTER,
-                        }
+                    int circleSize = _iconSize / 3;
+                    int inset = (_iconSize - circleSize) / 2;
+                    AddRect(
+                        frame,
+                        "Circle",
+                        columnLeft + inset + 1,
+                        iconTop + inset,
+                        circleSize,
+                        circleSize,
+                        _farmGroup.ProgrammableBlock.PlanterEmptyColor
                     );
                 }
             }
@@ -596,109 +580,107 @@ namespace IngameScript
         /// <param name="renderState">Pre-calculated rendering state with colors and growth progress</param>
         private void DrawFarmPlot(
             List<MySprite> frame,
-            float x,
-            float y,
+            int left,
+            int top,
             FarmPlot plot,
             RenderHelpers.PlotRenderState renderState
         )
         {
-            // Calculate vertical offset for growth section (half of water height + padding)
-            var growthYOffet = (_waterRectHeight + _plotPadding) / 2;
+            // All rects are integer left/top/width/height, inset from the outline by whole
+            // borders, so the border is the same width on every side at every screen size.
+            int pad = _plotPadding;
+            int innerLeft = left + pad;
+            int innerWidth = _rectWidth - 2 * pad;
+            int fillLeft = innerLeft + pad;
+            int fillWidth = innerWidth - 2 * pad;
 
-            // Draw outline rectangle with state-based color
-            frame.Add(
-                new MySprite()
-                {
-                    Type = SpriteType.TEXTURE,
-                    Data = "SquareSimple",
-                    Position = CreatePosition(x, y),
-                    Size = new Vector2(_rectWidth, RectHeight),
-                    Color = renderState.OutlineColor,
-                    Alignment = TextAlignment.CENTER,
-                }
+            // Outline rectangle with state-based color
+            AddRect(frame, "SquareSimple", left, top, _rectWidth, RectHeight, renderState.OutlineColor);
+
+            // Growth background, one border inside the outline
+            int growthBgTop = top + pad;
+            int growthBgHeight = _growthRectHeight - 2 * pad;
+            AddRect(
+                frame,
+                "SquareSimple",
+                innerLeft,
+                growthBgTop,
+                innerWidth,
+                growthBgHeight,
+                _surface.ScriptBackgroundColor
             );
 
-            // Draw background for growth section
-            // Available height = GrowthRectHeight - 2x padding (top and bottom)
-            float growthAvailableHeight = _growthRectHeight - (2 * _plotPadding);
-            // Shift down by half padding to center the padded background within the outline
-            float backgroundY = y - growthYOffet + (_plotPadding / 2);
-            frame.Add(
-                new MySprite()
-                {
-                    Type = SpriteType.TEXTURE,
-                    Data = "SquareSimple",
-                    Position = CreatePosition(x, backgroundY),
-                    Size = new Vector2(_rectWidth - (2 * _plotPadding), growthAvailableHeight),
-                    Color = _surface.ScriptBackgroundColor,
-                    Alignment = TextAlignment.CENTER,
-                }
-            );
-
-            float innerPadding = _plotPadding * 4;
-
-            // Draw filled rectangle based on growth
-            if (renderState.GrowthProgress > 0f)
+            // Growth fill, one border inside the background, growing up from the bottom
+            int growthFillMax = growthBgHeight - 2 * pad;
+            int growthFillHeight = (int)Math.Round(growthFillMax * renderState.GrowthProgress);
+            if (growthFillHeight > 0)
             {
-                // Use the same available height as the background
-                float filledHeight =
-                    (growthAvailableHeight - 2 * _plotPadding) * renderState.GrowthProgress;
-                float filledY = y + (_growthRectHeight - filledHeight - innerPadding) / 2;
-
-                frame.Add(
-                    new MySprite()
-                    {
-                        Type = SpriteType.TEXTURE,
-                        Data = "SquareSimple",
-                        Position = CreatePosition(x, filledY - growthYOffet + (_plotPadding / 2)),
-                        Size = new Vector2(_rectWidth - innerPadding, filledHeight),
-                        Color = renderState.ProgressBarColor,
-                        Alignment = TextAlignment.CENTER,
-                    }
+                AddRect(
+                    frame,
+                    "SquareSimple",
+                    fillLeft,
+                    growthBgTop + pad + growthFillMax - growthFillHeight,
+                    fillWidth,
+                    growthFillHeight,
+                    renderState.ProgressBarColor
                 );
             }
 
-            // Draw water level indicator below the farm plot
-            // Available height = WaterRectHeight - 2x padding (top and bottom, matching sides)
-            float waterAvailableHeight = _waterRectHeight - _plotPadding;
+            // Water background below the growth section, separated by one border
+            int waterBgTop = growthBgTop + growthBgHeight + pad;
+            int waterBgHeight = _waterRectHeight - pad;
+            AddRect(
+                frame,
+                "SquareSimple",
+                innerLeft,
+                waterBgTop,
+                innerWidth,
+                waterBgHeight,
+                _surface.ScriptBackgroundColor
+            );
 
-            // Vertical position for water rectangle
-            float waterRectY = y + (RectHeight / 2) - (_waterRectHeight / 2) - _plotPadding / 2;
+            // Water fill, one border inside the background, growing left to right
+            int waterFillWidth = (int)Math.Round(fillWidth * (float)plot.WaterFilledRatio);
+            if (waterFillWidth > 0)
+            {
+                AddRect(
+                    frame,
+                    "SquareSimple",
+                    fillLeft,
+                    waterBgTop + pad,
+                    waterFillWidth,
+                    waterBgHeight - 2 * pad,
+                    renderState.WaterBarColor
+                );
+            }
+        }
 
-            // Water level background
+        /// <summary>
+        /// Adds a texture sprite from an integer left/top/width/height rect. The centre may
+        /// land on a half pixel for odd sizes; the edges are what get rasterised and those
+        /// are always whole pixels.
+        /// </summary>
+        private void AddRect(
+            List<MySprite> frame,
+            string data,
+            int left,
+            int top,
+            int width,
+            int height,
+            Color color
+        )
+        {
             frame.Add(
                 new MySprite()
                 {
                     Type = SpriteType.TEXTURE,
-                    Data = "SquareSimple",
-                    Position = CreatePosition(x, waterRectY),
-                    Size = new Vector2(_rectWidth - (2 * _plotPadding), waterAvailableHeight),
-                    Color = _surface.ScriptBackgroundColor,
+                    Data = data,
+                    Position = CreatePosition(left + width / 2f, top + height / 2f),
+                    Size = new Vector2(width, height),
+                    Color = color,
                     Alignment = TextAlignment.CENTER,
                 }
             );
-
-            // Water level fill bar (left to right)
-            float waterRatio = (float)plot.WaterFilledRatio;
-            if (waterRatio > 0f)
-            {
-                // Use consistent padding with growth bar
-                float waterAvailableWidth = _rectWidth - innerPadding;
-                float filledWidth = waterAvailableWidth * waterRatio;
-                float waterFilledX = x - (waterAvailableWidth / 2) + (filledWidth / 2);
-
-                frame.Add(
-                    new MySprite()
-                    {
-                        Type = SpriteType.TEXTURE,
-                        Data = "SquareSimple",
-                        Position = CreatePosition(waterFilledX, waterRectY),
-                        Size = new Vector2(filledWidth, waterAvailableHeight - (2 * _plotPadding)),
-                        Color = renderState.WaterBarColor,
-                        Alignment = TextAlignment.CENTER,
-                    }
-                );
-            }
         }
 
         /// <summary>
